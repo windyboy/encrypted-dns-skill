@@ -7,13 +7,21 @@ description: Query, probe, and compare DNS resolution through supported encrypte
 
 Use `ednsdiag` for encrypted DNS work. Do not assemble protocol requests with
 `curl`, `openssl`, or ad-hoc scripts when `ednsdiag` supports the operation.
-The executable requires network access. Go 1.26+ is required only when building
-it from source.
+The executable requires network access.
 
-## Current implementation status
+Prefer an installed `ednsdiag` executable. When it is unavailable and Go 1.26+
+is installed, run the source from the skill root with:
 
-This repository is in its foundation phase. Before attempting an operation,
-run:
+```bash
+go run ./cmd/ednsdiag <command> [arguments]
+```
+
+Do not download or execute an unverified binary automatically. Building from
+source may require permission to download pinned Go modules.
+
+## Check capabilities
+
+Before attempting an operation, run:
 
 ```bash
 ednsdiag capabilities
@@ -22,18 +30,19 @@ ednsdiag capabilities
 Only use a protocol when its reported status is `available`. Never describe a
 `planned` or `experimental` capability as implemented.
 
-## Intended commands
+## Commands
 
 ```bash
 ednsdiag query example.com A --protocol doh --provider cloudflare
-ednsdiag probe --protocol dot --endpoint dns.quad9.net:853
-ednsdiag compare example.com A --protocols doh,dot,doq --provider quad9
+ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
 ednsdiag capabilities
 ednsdiag version
 ```
 
-`query`, `probe`, and `compare` are reserved interfaces until their capability
-is reported as available.
+Use `--method get` or `--method post` only with DoH. The default is POST.
+Built-in providers are `cloudflare`, `google`, `quad9`, and `adguard`. Provider
+filtering policies differ and are included in the result. `probe` and `compare`
+remain reserved until their capabilities are implemented.
 
 ## Required behavior
 
@@ -54,6 +63,8 @@ is reported as available.
   `NOERROR`.
 - Read `dns.rcode` for the DNS outcome.
 - Read `transport.server_authenticated` separately from DNSSEC fields.
+- Read `transport.bootstrap`; `system_resolver` means resolving the encrypted
+  resolver endpoint itself used the operating system resolver.
 - Empty answers with `NOERROR` represent NODATA.
 - A filtering resolver may synthesize `NXDOMAIN`; disclose the provider.
 

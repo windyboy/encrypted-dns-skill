@@ -16,7 +16,7 @@ standard, not on summaries or provider-specific JSON APIs.
 | EDNS(0) padding | [RFC 7830](https://www.rfc-editor.org/rfc/rfc7830.html) and [RFC 8467](https://www.rfc-editor.org/rfc/rfc8467.html) | Evaluate per transport |
 | DNSCrypt | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) | Planned, non-IETF |
 | Anonymized DNSCrypt | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) | Research |
-| Go transport engine | [AdGuard dnsproxy upstream package](https://pkg.go.dev/github.com/AdguardTeam/dnsproxy/upstream) | Candidate dependency; pin a release |
+| Go DNS wire and IDNA support | [Go x/net module](https://pkg.go.dev/golang.org/x/net) | Pinned to v0.58.0; use `dnsmessage` and `idna` |
 
 ## Deliberate exclusions
 
@@ -33,3 +33,8 @@ standard, not on summaries or provider-specific JSON APIs.
 DoH3 means RFC 8484 semantics carried over HTTP/3. It is not a separate DNS
 message format. DNSCrypt is an encrypted DNS protocol with its own
 specification; do not label it as an IETF RFC.
+
+For DoH, accept and send `application/dns-message`. Keep HTTP status separate
+from the DNS RCODE: a valid NXDOMAIN or SERVFAIL response still uses HTTP 2xx.
+For DoT, use the strict privacy profile and verify both the PKIX chain and the
+configured authentication domain name.

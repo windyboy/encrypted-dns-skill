@@ -21,7 +21,8 @@
       "type": "object",
       "properties": {
         "provider": { "type": "string" },
-        "endpoint": { "type": "string" }
+        "endpoint": { "type": "string" },
+        "profile": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -33,7 +34,10 @@
         "encrypted": { "type": "boolean" },
         "server_authenticated": { "type": "boolean" },
         "elapsed_ms": { "type": "integer", "minimum": 0 },
-        "bootstrap": { "type": "string" }
+        "bootstrap": { "type": "string" },
+        "tls_version": { "type": "string" },
+        "alpn": { "type": "string" },
+        "http_version": { "type": "string" }
       },
       "additionalProperties": true
     },
@@ -63,7 +67,16 @@
     },
     "fallback_used": { "type": "boolean" },
     "attempts": { "type": "array", "items": { "type": "object" } },
-    "warnings": { "type": "array", "items": { "type": "string" } }
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "error": {
+      "type": "object",
+      "required": ["class", "message"],
+      "properties": {
+        "class": { "enum": ["input", "transport", "protocol", "internal"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": true
 }

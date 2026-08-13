@@ -23,6 +23,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Resolve modules
+        run: go mod download -json all
       - name: Test
         run: go test ./...
       - name: Vet

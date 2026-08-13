@@ -1,17 +1,17 @@
 # Built-in provider policy
 
 Provider endpoints and capabilities must be verified against the provider's
-official documentation before they are added or changed. Record the
-verification date in the implementation change.
+official documentation before they are added or changed. The built-in entries
+below were verified on 2026-08-13.
 
 ## Candidate providers
 
-| Provider | Official documentation | Notes |
-| --- | --- | --- |
-| Cloudflare | [1.1.1.1 DoH API](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/) | Use RFC 8484 wire format for the core client |
-| Google | [Google Public DNS DoH](https://developers.google.com/speed/public-dns/docs/doh) | Distinguish `/dns-query` wire format from `/resolve` JSON |
-| Quad9 | [Quad9 services](https://docs.quad9.net/services/) | Filtering can affect NXDOMAIN semantics; DoH requires a standards-capable client |
-| AdGuard | [AdGuard public DNS servers](https://adguard-dns.io/en/public-dns/servers.html) | Supports multiple encrypted transports and filtering profiles |
+| Provider | DoH endpoint | DoT endpoint / authentication name | Official documentation | Profile |
+| --- | --- | --- | --- | --- |
+| Cloudflare | `https://cloudflare-dns.com/dns-query` | `one.one.one.one:853` | [DoH](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/) / [DoT](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-tls/) | Unfiltered |
+| Google | `https://dns.google/dns-query` | `dns.google:853` | [DoH](https://developers.google.com/speed/public-dns/docs/doh) / [DoT](https://developers.google.com/speed/public-dns/docs/dns-over-tls) | Unfiltered |
+| Quad9 | `https://dns.quad9.net/dns-query` | `dns.quad9.net:853` | [Quad9 services](https://docs.quad9.net/services/) | Security filtered; HTTP/2 required |
+| AdGuard | `https://dns.adguard-dns.com/dns-query` | `dns.adguard-dns.com:853` | [AdGuard providers](https://adguard-dns.io/kb/general/dns-providers/) | Ads, tracking, and security filtered |
 
 ## Registry requirements
 
