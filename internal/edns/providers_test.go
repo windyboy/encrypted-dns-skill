@@ -26,7 +26,9 @@ func TestProviderProtocolMatrix(t *testing.T) {
 		{provider: "cloudflare", protocol: "doh3", allowed: true},
 		{provider: "google", protocol: "doh3", allowed: true},
 		{provider: "adguard", protocol: "doq", allowed: true},
+		{provider: "adguard", protocol: "dnscrypt", allowed: true},
 		{provider: "cloudflare", protocol: "doq", allowed: false},
+		{provider: "cloudflare", protocol: "dnscrypt", allowed: false},
 		{provider: "quad9", protocol: "doh3", allowed: false},
 		{provider: "adguard", protocol: "doh3", allowed: false},
 	}
