@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,6 +101,99 @@ func TestExchangeDoTAuthenticatesServer(t *testing.T) {
 	}
 	if _, err := ParseResponse(response, transactionID, query); err != nil {
 		t.Fatalf("parse response: %v", err)
+	}
+}
+
+func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
+	certificate, roots := newTestCertificate(t, "resolver.test")
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+	})
+	if err != nil {
+		t.Fatalf("listen for DoT: %v", err)
+	}
+	defer listener.Close()
+
+	serverError := make(chan error, 1)
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			serverError <- err
+			return
+		}
+		defer connection.Close()
+		response, err := serveOneDoTQuery(connection)
+		if err == nil {
+			err = writeAll(connection, response)
+		}
+		serverError <- err
+	}()
+
+	queryWire, _, _, err := BuildQuery("example.com", "A")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, info, err := exchangeDoTWithTLSConfig(ctx, Provider{DoTAddr: listener.Addr().String(), DoTName: "resolver.test"}, queryWire, &tls.Config{
+		RootCAs:    roots,
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"dot"},
+	})
+	if err != nil {
+		t.Fatalf("exchange DoT without server ALPN: %v", err)
+	}
+	if err := <-serverError; err != nil {
+		t.Fatalf("serve DoT: %v", err)
+	}
+	if !info.ServerAuthenticated || info.ALPN != "" {
+		t.Fatalf("unexpected transport info: %#v", info)
+	}
+}
+
+func TestExchangeDoTRejectsUnexpectedALPN(t *testing.T) {
+	certificate, roots := newTestCertificate(t, "resolver.test")
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+		NextProtos:   []string{"http/1.1"},
+	})
+	if err != nil {
+		t.Fatalf("listen for TLS: %v", err)
+	}
+	defer listener.Close()
+
+	serverError := make(chan error, 1)
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			serverError <- err
+			return
+		}
+		defer connection.Close()
+		serverError <- connection.(*tls.Conn).Handshake()
+	}()
+
+	queryWire, _, _, err := BuildQuery("example.com", "A")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, info, err := exchangeDoTWithTLSConfig(ctx, Provider{DoTAddr: listener.Addr().String(), DoTName: "resolver.test"}, queryWire, &tls.Config{
+		RootCAs:    roots,
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"http/1.1"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unexpected ALPN protocol") {
+		t.Fatalf("exchange DoT error = %v, want unexpected ALPN error", err)
+	}
+	if err := <-serverError; err != nil {
+		t.Fatalf("complete TLS handshake: %v", err)
+	}
+	if !info.ServerAuthenticated || info.ALPN != "http/1.1" {
+		t.Fatalf("unexpected transport info: %#v", info)
 	}
 }
 

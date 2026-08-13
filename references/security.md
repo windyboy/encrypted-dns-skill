@@ -8,8 +8,8 @@ validation, fallback, or result claims.
 1. Never silently downgrade to plaintext DNS.
 2. Validate certificates and authentication domain names. DoT follows the
    strict privacy profile in [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html).
-3. Treat certificate, hostname, SNI, and ALPN failures as hard failures, not
-   fallback opportunities.
+3. Treat certificate, hostname, SNI, and negotiated ALPN mismatches as hard
+   failures, not fallback opportunities.
 4. Bound response sizes, per-attempt timeouts, total time, redirects, and the
    number of attempts.
 5. Do not expose an unrestricted endpoint parameter to an Agent. Built-in
@@ -18,6 +18,13 @@ validation, fallback, or result claims.
 6. Do not connect to addresses returned in DNS answers.
 7. Do not enable AXFR, IXFR, or ANY queries.
 8. Do not persist full query names or client identifiers by default.
+
+## DoT ALPN policy
+
+The client advertises the `dot` ALPN identifier. RFC 7858 and RFC 8310 do not
+require a DoT server on its dedicated port to select an ALPN protocol, so an
+empty negotiated ALPN is permitted and reported as empty. If a server selects
+a non-empty protocol other than `dot`, abort before sending the DNS query.
 
 ## Bootstrap transparency
 
