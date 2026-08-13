@@ -15,8 +15,8 @@ URLs, TLS sessions, or DNS wire messages themselves.
 | --- | --- | --- |
 | DNS over HTTPS (DoH) | Available (GET and POST) | [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) |
 | DNS over TLS (DoT) | Available (strict authentication) | [RFC 7858](https://www.rfc-editor.org/rfc/rfc7858.html), [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html) |
-| DNS over QUIC (DoQ) | Planned | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) |
-| DoH over HTTP/3 (DoH3) | Planned | RFC 8484 over HTTP/3 |
+| DNS over QUIC (DoQ) | Available | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) |
+| DoH over HTTP/3 (DoH3) | Available (GET and POST) | RFC 8484 over HTTP/3 |
 | DNSCrypt | Planned | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) |
 | Oblivious DoH (ODoH) | Research | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) |
 | Anonymized DNSCrypt | Research | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) |
@@ -66,6 +66,8 @@ the repository root:
 go run ./cmd/ednsdiag capabilities
 go run ./cmd/ednsdiag query example.com A --protocol doh --provider cloudflare
 go run ./cmd/ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
+go run ./cmd/ednsdiag query example.com AAAA --protocol doq --provider adguard
+go run ./cmd/ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
 ```
 
 The first run may download the modules pinned in `go.mod` and `go.sum`.
@@ -86,23 +88,23 @@ does not currently publish release binaries.
 ednsdiag capabilities
 ednsdiag version
 ednsdiag query <domain> [type] \
-  [--protocol doh|dot] \
+  [--protocol doh|dot|doq|doh3] \
   [--provider cloudflare|google|quad9|adguard] \
   [--method post|get] \
   [--timeout 5s]
 ```
 
 Defaults are `A`, `doh`, `cloudflare`, `post`, and `5s`. `--method` applies
-only to DoH. The timeout must be between `250ms` and `30s`.
+only to DoH and DoH3. The timeout must be between `250ms` and `30s`.
 
 Built-in resolver profiles:
 
-| Provider | Profile |
-| --- | --- |
-| Cloudflare | Unfiltered |
-| Google | Unfiltered |
-| Quad9 | Security-filtered |
-| AdGuard | Ad- and security-filtered |
+| Provider | Profile | DoH | DoT | DoQ | DoH3 |
+| --- | --- | --- | --- | --- | --- |
+| Cloudflare | Unfiltered | Yes | Yes | No | Yes |
+| Google | Unfiltered | Yes | Yes | No | Yes |
+| Quad9 | Security-filtered | Yes | Yes | No | No |
+| AdGuard | Ad- and security-filtered | Yes | Yes | Yes | No |
 
 Filtering policies can affect DNS answers. Results always identify the
 provider and profile used.
