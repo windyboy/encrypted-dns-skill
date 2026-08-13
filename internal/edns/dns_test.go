@@ -3,6 +3,7 @@ package edns
 import (
 	"encoding/binary"
 	"reflect"
+	"strings"
 	"testing"
 
 	"golang.org/x/net/dns/dnsmessage"
@@ -118,7 +119,10 @@ func TestNormalizeSupportedAnswerTypes(t *testing.T) {
 		{"priority": uint16(1), "target": "target.example", "params": []map[string]any{}},
 	}
 	for index, resource := range resources {
-		record := normalizeAnswer(resource)
+		record, err := normalizeAnswer(resource)
+		if err != nil {
+			t.Fatalf("normalize %s: %v", wantTypes[index], err)
+		}
 		if record["type"] != wantTypes[index] || record["name"] != "example.com" || record["ttl"] != uint32(60) {
 			t.Fatalf("unexpected %s normalization: %#v", wantTypes[index], record)
 		}
@@ -133,10 +137,13 @@ func TestNormalizeSupportedAnswerTypes(t *testing.T) {
 func TestNormalizeCAA(t *testing.T) {
 	name := dnsmessage.MustNewName("example.com.")
 	data := append([]byte{0, 5}, []byte("issueletsencrypt.org")...)
-	record := normalizeAnswer(dnsmessage.Resource{
+	record, err := normalizeAnswer(dnsmessage.Resource{
 		Header: dnsmessage.ResourceHeader{Name: name, Type: dnsmessage.Type(257), Class: dnsmessage.ClassINET, TTL: 300},
 		Body:   &dnsmessage.UnknownResource{Type: dnsmessage.Type(257), Data: data},
 	})
+	if err != nil {
+		t.Fatalf("normalize CAA: %v", err)
+	}
 	if record["tag"] != "issue" || record["value"] != "letsencrypt.org" {
 		t.Fatalf("unexpected CAA normalization: %#v", record)
 	}
@@ -158,5 +165,133 @@ func TestParseResponseRejectsTransactionMismatch(t *testing.T) {
 
 	if binary.BigEndian.Uint16(wire[:2]) != 2 {
 		t.Fatal("test response ID was not encoded")
+	}
+}
+
+func TestParseResponseRejectsIncompleteOrNonStandardMessages(t *testing.T) {
+	queryWire, query, transactionID, err := BuildQuery("example.com", "A")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	var request dnsmessage.Message
+	if err := request.Unpack(queryWire); err != nil {
+		t.Fatalf("unpack query: %v", err)
+	}
+	validAnswer := dnsmessage.Resource{
+		Header: dnsmessage.ResourceHeader{Name: request.Questions[0].Name, Type: dnsmessage.TypeA, Class: dnsmessage.ClassINET, TTL: 60},
+		Body:   &dnsmessage.AResource{A: [4]byte{192, 0, 2, 1}},
+	}
+
+	tests := []struct {
+		name    string
+		message dnsmessage.Message
+		want    string
+	}{
+		{
+			name: "truncated",
+			message: dnsmessage.Message{Header: dnsmessage.Header{ID: transactionID, Response: true, Truncated: true},
+				Questions: request.Questions},
+			want: "truncated",
+		},
+		{
+			name: "unexpected opcode",
+			message: dnsmessage.Message{Header: dnsmessage.Header{ID: transactionID, Response: true, OpCode: 1},
+				Questions: request.Questions},
+			want: "opcode",
+		},
+		{
+			name: "non-IN question",
+			message: dnsmessage.Message{Header: dnsmessage.Header{ID: transactionID, Response: true}, Questions: []dnsmessage.Question{{
+				Name: request.Questions[0].Name, Type: dnsmessage.TypeA, Class: dnsmessage.ClassCHAOS,
+			}}},
+			want: "question does not match",
+		},
+		{
+			name: "non-IN answer",
+			message: dnsmessage.Message{Header: dnsmessage.Header{ID: transactionID, Response: true}, Questions: request.Questions, Answers: []dnsmessage.Resource{{
+				Header: dnsmessage.ResourceHeader{Name: request.Questions[0].Name, Type: dnsmessage.TypeA, Class: dnsmessage.ClassCHAOS, TTL: 60},
+				Body:   &dnsmessage.AResource{A: [4]byte{192, 0, 2, 1}},
+			}}},
+			want: "unsupported class",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wire, err := test.message.Pack()
+			if err != nil {
+				t.Fatalf("pack response: %v", err)
+			}
+			if _, err := ParseResponse(wire, transactionID, query); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+
+	valid := dnsmessage.Message{Header: dnsmessage.Header{ID: transactionID, Response: true}, Questions: request.Questions, Answers: []dnsmessage.Resource{validAnswer}}
+	if _, err := valid.Pack(); err != nil {
+		t.Fatalf("valid fixture does not pack: %v", err)
+	}
+}
+
+func TestParseResponseRejectsNonRepresentableAnswers(t *testing.T) {
+	queryWire, query, transactionID, err := BuildQuery("example.com", "CAA")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	var request dnsmessage.Message
+	if err := request.Unpack(queryWire); err != nil {
+		t.Fatalf("unpack query: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		record   dnsmessage.Resource
+		contains string
+	}{
+		{
+			name: "truncated CAA tag",
+			record: dnsmessage.Resource{
+				Header: dnsmessage.ResourceHeader{Name: request.Questions[0].Name, Type: dnsmessage.Type(257), Class: dnsmessage.ClassINET, TTL: 60},
+				Body:   &dnsmessage.UnknownResource{Type: dnsmessage.Type(257), Data: []byte{0, 5, 'i'}},
+			},
+			contains: "truncated tag",
+		},
+		{
+			name: "unknown answer type",
+			record: dnsmessage.Resource{
+				Header: dnsmessage.ResourceHeader{Name: request.Questions[0].Name, Type: dnsmessage.Type(99), Class: dnsmessage.ClassINET, TTL: 60},
+				Body:   &dnsmessage.UnknownResource{Type: dnsmessage.Type(99), Data: []byte{1, 2}},
+			},
+			contains: "cannot be represented",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			message := dnsmessage.Message{
+				Header:    dnsmessage.Header{ID: transactionID, Response: true},
+				Questions: request.Questions,
+				Answers:   []dnsmessage.Resource{test.record},
+			}
+			wire, err := message.Pack()
+			if err != nil {
+				t.Fatalf("pack response: %v", err)
+			}
+			if _, err := ParseResponse(wire, transactionID, query); err == nil || !strings.Contains(err.Error(), test.contains) {
+				t.Fatalf("error = %v, want substring %q", err, test.contains)
+			}
+		})
+	}
+}
+
+func TestApplyHTTPAgeClampsAnswerTTL(t *testing.T) {
+	info := DNSInfo{Answers: []AnswerRecord{
+		{"ttl": uint32(120)},
+		{"ttl": uint32(30)},
+	}}
+	applyHTTPAge(&info, 45)
+	if info.Answers[0]["ttl"] != uint32(75) || info.Answers[1]["ttl"] != uint32(0) {
+		t.Fatalf("unexpected aged TTLs: %#v", info.Answers)
 	}
 }

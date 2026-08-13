@@ -42,6 +42,7 @@ func TestExchangeDoHGETAndPOST(t *testing.T) {
 			return
 		}
 		writer.Header().Set("Content-Type", "application/dns-message")
+		writer.Header().Set("Age", "10")
 		_, _ = writer.Write(responseWire)
 	}))
 	defer server.Close()
@@ -56,10 +57,23 @@ func TestExchangeDoHGETAndPOST(t *testing.T) {
 			if err != nil {
 				t.Fatalf("exchange DoH: %v", err)
 			}
-			if len(response) == 0 || !info.Encrypted || !info.ServerAuthenticated {
+			if len(response) == 0 || !info.Encrypted || !info.ServerAuthenticated || info.HTTPAgeSeconds != 10 {
 				t.Fatalf("unexpected result: response=%d info=%#v", len(response), info)
 			}
 		})
+	}
+}
+
+func TestExchangeDoHRejectsInvalidAge(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/dns-message")
+		writer.Header().Set("Age", "invalid")
+		_, _ = writer.Write([]byte{1})
+	}))
+	defer server.Close()
+
+	if _, _, err := exchangeDoHWithClient(t.Context(), server.Client(), server.URL, []byte{1}, "post"); err == nil {
+		t.Fatal("invalid HTTP Age was accepted")
 	}
 }
 

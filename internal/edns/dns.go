@@ -84,6 +84,12 @@ func ParseResponse(wire []byte, expectedID uint16, query QueryInfo) (DNSInfo, er
 	if !message.Header.Response {
 		return DNSInfo{}, fmt.Errorf("received a DNS query instead of a response")
 	}
+	if message.Header.OpCode != 0 {
+		return DNSInfo{}, fmt.Errorf("DNS response uses unexpected opcode %d", message.Header.OpCode)
+	}
+	if message.Header.Truncated {
+		return DNSInfo{}, fmt.Errorf("DNS response is truncated")
+	}
 	if message.Header.ID != expectedID {
 		return DNSInfo{}, fmt.Errorf("DNS transaction ID mismatch")
 	}
@@ -92,13 +98,20 @@ func ParseResponse(wire []byte, expectedID uint16, query QueryInfo) (DNSInfo, er
 	}
 	wantType := recordTypes[query.Type]
 	question := message.Questions[0]
-	if trimRoot(question.Name.String()) != query.Name || question.Type != wantType {
+	if trimRoot(question.Name.String()) != query.Name || question.Type != wantType || question.Class != dnsmessage.ClassINET {
 		return DNSInfo{}, fmt.Errorf("DNS response question does not match request")
 	}
 
 	answers := make([]AnswerRecord, 0, len(message.Answers))
 	for _, resource := range message.Answers {
-		answers = append(answers, normalizeAnswer(resource))
+		if resource.Header.Class != dnsmessage.ClassINET {
+			return DNSInfo{}, fmt.Errorf("DNS answer %q uses unsupported class %d", trimRoot(resource.Header.Name.String()), resource.Header.Class)
+		}
+		answer, err := normalizeAnswer(resource)
+		if err != nil {
+			return DNSInfo{}, err
+		}
+		answers = append(answers, answer)
 	}
 
 	return DNSInfo{
@@ -142,7 +155,7 @@ func canonicalName(input string) (string, error) {
 	return ascii, nil
 }
 
-func normalizeAnswer(resource dnsmessage.Resource) AnswerRecord {
+func normalizeAnswer(resource dnsmessage.Resource) (AnswerRecord, error) {
 	record := AnswerRecord{
 		"name": trimRoot(resource.Header.Name.String()),
 		"type": typeName(resource.Header.Type),
@@ -190,13 +203,32 @@ func normalizeAnswer(resource dnsmessage.Resource) AnswerRecord {
 				record["tag"] = string(body.Data[2 : 2+tagLength])
 				record["value"] = string(body.Data[2+tagLength:])
 			} else {
-				record["rdata_base64"] = base64.StdEncoding.EncodeToString(body.Data)
+				return nil, fmt.Errorf("CAA answer contains a truncated tag")
 			}
 		} else {
-			record["rdata_base64"] = base64.StdEncoding.EncodeToString(body.Data)
+			return nil, fmt.Errorf("DNS answer type %s cannot be represented by result-v1", typeName(resource.Header.Type))
+		}
+	default:
+		return nil, fmt.Errorf("DNS answer type %s has an unexpected wire representation", typeName(resource.Header.Type))
+	}
+	return record, nil
+}
+
+func applyHTTPAge(info *DNSInfo, ageSeconds int64) {
+	if ageSeconds <= 0 {
+		return
+	}
+	for _, answer := range info.Answers {
+		ttl, ok := answer["ttl"].(uint32)
+		if !ok {
+			continue
+		}
+		if ageSeconds >= int64(ttl) {
+			answer["ttl"] = uint32(0)
+		} else {
+			answer["ttl"] = ttl - uint32(ageSeconds)
 		}
 	}
-	return record
 }
 
 func addSVCBFields(record AnswerRecord, priority uint16, target dnsmessage.Name, params []dnsmessage.SVCParam) {

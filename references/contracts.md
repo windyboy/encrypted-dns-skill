@@ -11,8 +11,9 @@ inputs. They differ only in the `operation` label so an agent can distinguish a
 lookup from an explicit connectivity diagnostic without interpreting prose.
 
 `compare` requires 2–8 explicit, unique targets in
-`protocol:provider[:method]` form. It runs each target as a separate query,
-retains target order, and returns the complete per-target result in `attempts`.
+`protocol:provider[:method]` form. It starts each target independently under
+the same total deadline, retains target order, and returns the complete
+per-target result in `attempts`.
 It never merges, ranks, or treats differing answers as interchangeable.
 
 ## Input policy
@@ -62,11 +63,15 @@ Every operation uses `schema_version: 1` and validates against
 - `dns.client_validated_dnssec` is always `false`; this client does not claim
   local DNSSEC validation.
 - `transport.server_authenticated` is independent from DNSSEC.
+- `transport.http_age_seconds`, when present, records the HTTP cache age
+  subtracted from DoH and DoH3 answer TTLs.
 - `compare.attempts` contains complete `query` results. `summary` only counts
   them; it does not replace or combine them.
 - Record answers have type-specific stable fields. TXT character-strings are
   returned as an array without presentation-format quotes. MX, SRV, SOA,
   CAA, SVCB, and HTTPS components remain separately typed fields.
+- Truncated DNS messages and answer data that cannot be represented by the v1
+  type-specific contract are protocol failures, never completed results.
 
 Adding an optional field is backward-compatible within v1. Removing a field,
 renaming a field, changing its meaning or type, or changing command/exit
