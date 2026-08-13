@@ -6,9 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 
-	"github.com/miekg/dns"
 	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/idna"
 )
@@ -38,12 +38,11 @@ func BuildQuery(name, recordType string) ([]byte, QueryInfo, uint16, error) {
 	var canonical string
 	var err error
 	if typeName == "PTR" {
-		address := net.ParseIP(strings.TrimSpace(name))
-		if address == nil {
+		address, parseErr := netip.ParseAddr(strings.TrimSpace(name))
+		if parseErr != nil {
 			return nil, QueryInfo{}, 0, fmt.Errorf("PTR queries require an IPv4 or IPv6 address")
 		}
-		canonical, err = dns.ReverseAddr(address.String())
-		canonical = strings.TrimSuffix(canonical, ".")
+		canonical = reverseName(address.Unmap())
 	} else {
 		canonical, err = canonicalName(name)
 	}
@@ -74,6 +73,22 @@ func BuildQuery(name, recordType string) ([]byte, QueryInfo, uint16, error) {
 		return nil, QueryInfo{}, 0, fmt.Errorf("pack DNS query: %w", err)
 	}
 	return wire, QueryInfo{Name: canonical, Type: typeName}, id, nil
+}
+
+func reverseName(address netip.Addr) string {
+	if address.Is4() {
+		bytes := address.As4()
+		return fmt.Sprintf("%d.%d.%d.%d.in-addr.arpa", bytes[3], bytes[2], bytes[1], bytes[0])
+	}
+
+	bytes := address.As16()
+	var builder strings.Builder
+	// Each IPv6 nibble is emitted from least to most significant per RFC 3596.
+	for index := len(bytes) - 1; index >= 0; index-- {
+		fmt.Fprintf(&builder, "%x.%x.", bytes[index]&0x0f, bytes[index]>>4)
+	}
+	builder.WriteString("ip6.arpa")
+	return builder.String()
 }
 
 func ParseResponse(wire []byte, expectedID uint16, query QueryInfo) (DNSInfo, error) {

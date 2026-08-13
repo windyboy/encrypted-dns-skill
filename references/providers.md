@@ -25,6 +25,11 @@ Each built-in provider entry must include:
 - official source URL;
 - last verification date.
 
+The runtime `Provider` registry stores the official source URL and verification
+date alongside each endpoint. Update both fields whenever an endpoint or
+capability is re-verified; the markdown table alone is not authoritative for
+runtime metadata.
+
 Do not infer one protocol endpoint from another. Do not treat filtering and
 non-filtering services as interchangeable. Provider comparison results must
 remain separate.

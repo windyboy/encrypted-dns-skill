@@ -8,7 +8,7 @@ validation, fallback, or result claims.
 1. Never silently downgrade to plaintext DNS.
 2. Validate certificates and authentication domain names. DoT follows the
    strict privacy profile in [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html).
-3. Treat certificate, hostname, SNI, and negotiated ALPN mismatches as hard
+3. Treat certificate, hostname, SNI, and any non-empty negotiated ALPN mismatch as hard
    failures, not fallback opportunities.
 4. Bound response sizes, per-attempt timeouts, total time, redirects, and the
    number of attempts.
@@ -21,9 +21,13 @@ validation, fallback, or result claims.
 
 ## DoT ALPN policy
 
-The client advertises the `dot` ALPN identifier and requires the server to
-select it. A missing or different ALPN is a hard failure before the DNS query
-is sent. This is the repository's strict authentication policy.
+The client advertises the IANA-registered `dot` ALPN identifier. An explicit
+selection other than `dot` is a hard failure before the DNS query is sent. An
+empty selection is permitted and reported because RFC 7858 and RFC 8310 do not
+make ALPN negotiation part of DoT server authentication; the dedicated port,
+PKIX chain, SNI, and configured authentication domain still identify the
+service. This deliberately restores the policy from PR #9 and supersedes the
+stricter empty-ALPN rejection introduced by PR #11.
 
 ## QUIC transport policy
 

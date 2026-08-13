@@ -20,6 +20,8 @@ func IsUnsupported(err error) bool {
 type Provider struct {
 	ID            string
 	Profile       string
+	SourceURL     string
+	VerifiedDate  string
 	DoHURL        string
 	DoTAddr       string
 	DoTName       string
@@ -31,31 +33,39 @@ type Provider struct {
 
 var providers = map[string]Provider{
 	"cloudflare": {
-		ID:      "cloudflare",
-		Profile: "unfiltered",
-		DoHURL:  "https://cloudflare-dns.com/dns-query",
-		DoTAddr: "one.one.one.one:853",
-		DoTName: "one.one.one.one",
-		DoH3URL: "https://cloudflare-dns.com/dns-query",
+		ID:           "cloudflare",
+		Profile:      "unfiltered",
+		SourceURL:    "https://developers.cloudflare.com/1.1.1.1/encryption/",
+		VerifiedDate: "2026-08-13",
+		DoHURL:       "https://cloudflare-dns.com/dns-query",
+		DoTAddr:      "one.one.one.one:853",
+		DoTName:      "one.one.one.one",
+		DoH3URL:      "https://cloudflare-dns.com/dns-query",
 	},
 	"google": {
-		ID:      "google",
-		Profile: "unfiltered",
-		DoHURL:  "https://dns.google/dns-query",
-		DoTAddr: "dns.google:853",
-		DoTName: "dns.google",
-		DoH3URL: "https://dns.google/dns-query",
+		ID:           "google",
+		Profile:      "unfiltered",
+		SourceURL:    "https://developers.google.com/speed/public-dns/docs/secure-transports",
+		VerifiedDate: "2026-08-13",
+		DoHURL:       "https://dns.google/dns-query",
+		DoTAddr:      "dns.google:853",
+		DoTName:      "dns.google",
+		DoH3URL:      "https://dns.google/dns-query",
 	},
 	"quad9": {
-		ID:      "quad9",
-		Profile: "security-filtered",
-		DoHURL:  "https://dns.quad9.net/dns-query",
-		DoTAddr: "dns.quad9.net:853",
-		DoTName: "dns.quad9.net",
+		ID:           "quad9",
+		Profile:      "security-filtered",
+		SourceURL:    "https://docs.quad9.net/services/",
+		VerifiedDate: "2026-08-13",
+		DoHURL:       "https://dns.quad9.net/dns-query",
+		DoTAddr:      "dns.quad9.net:853",
+		DoTName:      "dns.quad9.net",
 	},
 	"adguard": {
 		ID:            "adguard",
 		Profile:       "ad-and-security-filtered",
+		SourceURL:     "https://adguard-dns.io/kb/en/public-dns/overview/",
+		VerifiedDate:  "2026-08-13",
 		DoHURL:        "https://dns.adguard-dns.com/dns-query",
 		DoTAddr:       "dns.adguard-dns.com:853",
 		DoTName:       "dns.adguard-dns.com",

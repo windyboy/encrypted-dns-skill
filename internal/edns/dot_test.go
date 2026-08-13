@@ -104,7 +104,7 @@ func TestExchangeDoTAuthenticatesServer(t *testing.T) {
 	}
 }
 
-func TestExchangeDoTRejectsMissingALPN(t *testing.T) {
+func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
 	certificate, roots := newTestCertificate(t, "resolver.test")
 	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
 		Certificates: []tls.Certificate{certificate},
@@ -123,7 +123,11 @@ func TestExchangeDoTRejectsMissingALPN(t *testing.T) {
 			return
 		}
 		defer connection.Close()
-		serverError <- connection.(*tls.Conn).Handshake()
+		response, err := serveOneDoTQuery(connection)
+		if err == nil {
+			err = writeAll(connection, response)
+		}
+		serverError <- err
 	}()
 
 	queryWire, _, _, err := BuildQuery("example.com", "A")
@@ -132,19 +136,22 @@ func TestExchangeDoTRejectsMissingALPN(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	_, info, err := exchangeDoTWithTLSConfig(ctx, Provider{DoTAddr: listener.Addr().String(), DoTName: "resolver.test"}, queryWire, &tls.Config{
+	response, info, err := exchangeDoTWithTLSConfig(ctx, Provider{DoTAddr: listener.Addr().String(), DoTName: "resolver.test"}, queryWire, &tls.Config{
 		RootCAs:    roots,
 		MinVersion: tls.VersionTLS12,
 		NextProtos: []string{"dot"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "unexpected ALPN protocol") {
-		t.Fatalf("exchange DoT error = %v, want missing ALPN error", err)
+	if err != nil {
+		t.Fatalf("exchange DoT without ALPN: %v", err)
 	}
 	if err := <-serverError; err != nil {
 		t.Fatalf("serve DoT: %v", err)
 	}
 	if !info.ServerAuthenticated || info.ALPN != "" {
 		t.Fatalf("unexpected transport info: %#v", info)
+	}
+	if _, err := ParseResponse(response, binary.BigEndian.Uint16(queryWire[:2]), QueryInfo{Name: "example.com", Type: "A"}); err != nil {
+		t.Fatalf("parse response without ALPN: %v", err)
 	}
 }
 

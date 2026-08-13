@@ -29,6 +29,8 @@ jobs:
           fi
       - name: Check module files
         run: go mod tidy && git diff --exit-code
+      - name: Validate Agent Skill package
+        run: python3 scripts/validate_skill.py .
       - name: Static analysis
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
       - name: Vulnerability scan
@@ -57,5 +59,10 @@ jobs:
         env:
           EDNSDIAG_DNSCRYPT_INTEROP: "1"
         run: go test ./internal/edns -run '^TestDNSCryptAdGuardInteroperability$' -count=1
+      - name: Public DoH and DoT interoperability
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          EDNSDIAG_PUBLIC_INTEROP: "1"
+        run: go test ./internal/edns -run '^TestPublicCloudflareDo[HT]Interoperability$' -count=1 -v
       - name: Vet
         run: go vet ./...

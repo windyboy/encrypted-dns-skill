@@ -50,6 +50,39 @@ func TestQueryReturnsProtocolErrorForTruncatedResponse(t *testing.T) {
 	}
 }
 
+func TestQueryTreatsREFUSEDAndNODATAAsCompletedDNSOutcomes(t *testing.T) {
+	tests := []struct {
+		name  string
+		rcode dnsmessage.RCode
+		want  string
+	}{
+		{name: "REFUSED", rcode: dnsmessage.RCodeRefused, want: "REFUSED"},
+		{name: "NODATA", rcode: dnsmessage.RCodeSuccess, want: "NOERROR"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			exchange := func(_ context.Context, _ Provider, wire []byte, options QueryOptions) ([]byte, TransportInfo, dnsCryptPeerInfo, error) {
+				var request dnsmessage.Message
+				if err := request.Unpack(wire); err != nil {
+					return nil, TransportInfo{}, dnsCryptPeerInfo{}, err
+				}
+				message := dnsmessage.Message{
+					Header:    dnsmessage.Header{ID: request.Header.ID, Response: true, RCode: test.rcode},
+					Questions: request.Questions,
+				}
+				response, err := message.Pack()
+				return response, testTransport(options.Protocol, 0), dnsCryptPeerInfo{}, err
+			}
+			result := queryWithExchange(t.Context(), QueryOptions{
+				Name: "example.com", RecordType: "A", Protocol: "doh", Provider: "cloudflare", Method: "post",
+			}, exchange)
+			if !result.Completed || result.Error != nil || result.DNS.RCode != test.want || len(result.DNS.Answers) != 0 {
+				t.Fatalf("unexpected %s result: %#v", test.name, result)
+			}
+		})
+	}
+}
+
 func TestQueryAppliesHTTPAgeToAnswerTTL(t *testing.T) {
 	result := queryWithExchange(t.Context(), QueryOptions{
 		Name: "example.com", RecordType: "A", Protocol: "doh", Provider: "cloudflare", Method: "post",

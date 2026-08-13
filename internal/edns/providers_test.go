@@ -1,6 +1,10 @@
 package edns
 
-import "testing"
+import (
+	"net/url"
+	"testing"
+	"time"
+)
 
 func TestBuiltInProvidersHaveStrictEndpoints(t *testing.T) {
 	for _, name := range []string{"cloudflare", "google", "quad9", "adguard"} {
@@ -10,6 +14,13 @@ func TestBuiltInProvidersHaveStrictEndpoints(t *testing.T) {
 		}
 		if provider.DoHURL == "" || provider.DoTAddr == "" || provider.DoTName == "" {
 			t.Fatalf("provider %s is incomplete: %#v", name, provider)
+		}
+		source, err := url.ParseRequestURI(provider.SourceURL)
+		if err != nil || source.Scheme != "https" || source.Host == "" {
+			t.Fatalf("provider %s has invalid official source URL %q: %v", name, provider.SourceURL, err)
+		}
+		if _, err := time.Parse(time.DateOnly, provider.VerifiedDate); err != nil {
+			t.Fatalf("provider %s has invalid verification date %q: %v", name, provider.VerifiedDate, err)
 		}
 	}
 	if _, err := FindProvider("custom"); err == nil {
