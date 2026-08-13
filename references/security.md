@@ -38,6 +38,10 @@ length prefix, DNS Message ID 0, and STREAM FIN. Truncated frames, extra
 responses, non-zero response IDs, unexpected streams, and missing FIN are
 protocol failures; they never trigger plaintext or cross-protocol fallback.
 
+Reject DNS messages with the TC bit set on every encrypted transport. In
+particular, the UDP-only DNSCrypt implementation must not expose a partial
+answer as a completed lookup.
+
 ## DNSCrypt transport policy
 
 Accept only allowlisted DNSCrypt v2 stamps. Validate the stamp type, provider
