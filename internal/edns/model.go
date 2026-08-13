@@ -43,11 +43,11 @@ type TransportInfo struct {
 }
 
 type DNSInfo struct {
-	RCode                                string         `json:"rcode"`
-	RCodeValue                           int            `json:"rcode_value"`
-	ResolverReportsDNSSECAuthenticated   bool           `json:"resolver_reports_dnssec_authenticated"`
-	ClientValidatedDNSSEC                bool           `json:"client_validated_dnssec"`
-	Answers                              []AnswerRecord `json:"answers"`
+	RCode                              string         `json:"rcode"`
+	RCodeValue                         int            `json:"rcode_value"`
+	ResolverReportsDNSSECAuthenticated bool           `json:"resolver_reports_dnssec_authenticated"`
+	ClientValidatedDNSSEC              bool           `json:"client_validated_dnssec"`
+	Answers                            []AnswerRecord `json:"answers"`
 }
 
 type AnswerRecord map[string]any

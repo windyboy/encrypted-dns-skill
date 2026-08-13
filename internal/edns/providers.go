@@ -6,11 +6,11 @@ import (
 )
 
 type Provider struct {
-	ID       string
-	Profile  string
-	DoHURL   string
-	DoTAddr  string
-	DoTName  string
+	ID      string
+	Profile string
+	DoHURL  string
+	DoTAddr string
+	DoTName string
 }
 
 var providers = map[string]Provider{
