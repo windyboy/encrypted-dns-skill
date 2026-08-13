@@ -25,7 +25,6 @@ func TestExchangeDoQ(t *testing.T) {
 			serverError <- err
 			return
 		}
-		defer connection.CloseWithError(doqNoError, "")
 		stream, err := connection.AcceptStream(t.Context())
 		if err != nil {
 			serverError <- err
@@ -45,15 +44,19 @@ func TestExchangeDoQ(t *testing.T) {
 			serverError <- err
 			return
 		}
-		response, err := (dnsmessage.Message{
+		responseMessage := dnsmessage.Message{
 			Header:    dnsmessage.Header{ID: 0, Response: true, RCode: dnsmessage.RCodeNameError},
 			Questions: query.Questions,
-		}).Pack()
+		}
+		response, err := responseMessage.Pack()
 		if err == nil {
 			err = writeDNSFrame(stream, response)
 		}
 		if err == nil {
 			err = stream.Close()
+		}
+		if err == nil {
+			<-connection.Context().Done()
 		}
 		serverError <- err
 	}()
@@ -93,7 +96,6 @@ func TestExchangeDoQRejectsMalformedFrame(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer connection.CloseWithError(doqNoError, "")
 		stream, err := connection.AcceptStream(t.Context())
 		if err != nil {
 			return
@@ -101,6 +103,7 @@ func TestExchangeDoQRejectsMalformedFrame(t *testing.T) {
 		_, _ = readDNSFrame(stream)
 		_, _ = stream.Write([]byte{0, 20, 1})
 		_ = stream.Close()
+		<-connection.Context().Done()
 	}()
 
 	wire, _, _, _ := BuildQuery("example.com", "A")
