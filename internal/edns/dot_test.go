@@ -104,7 +104,7 @@ func TestExchangeDoTAuthenticatesServer(t *testing.T) {
 	}
 }
 
-func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
+func TestExchangeDoTRejectsMissingALPN(t *testing.T) {
 	certificate, roots := newTestCertificate(t, "resolver.test")
 	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
 		Certificates: []tls.Certificate{certificate},
@@ -123,11 +123,7 @@ func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
 			return
 		}
 		defer connection.Close()
-		response, err := serveOneDoTQuery(connection)
-		if err == nil {
-			err = writeAll(connection, response)
-		}
-		serverError <- err
+		serverError <- connection.(*tls.Conn).Handshake()
 	}()
 
 	queryWire, _, _, err := BuildQuery("example.com", "A")
@@ -141,8 +137,8 @@ func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
 		MinVersion: tls.VersionTLS12,
 		NextProtos: []string{"dot"},
 	})
-	if err != nil {
-		t.Fatalf("exchange DoT without server ALPN: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "unexpected ALPN protocol") {
+		t.Fatalf("exchange DoT error = %v, want missing ALPN error", err)
 	}
 	if err := <-serverError; err != nil {
 		t.Fatalf("serve DoT: %v", err)
