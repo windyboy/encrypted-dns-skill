@@ -85,6 +85,13 @@ func TestBuildPTRQueryFromIPAddress(t *testing.T) {
 	if ipv6.Name != "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa" {
 		t.Fatalf("unexpected IPv6 PTR name: %q", ipv6.Name)
 	}
+	_, mappedIPv4, _, err := BuildQuery("::ffff:192.0.2.1", "PTR")
+	if err != nil {
+		t.Fatalf("build IPv4-mapped PTR query: %v", err)
+	}
+	if mappedIPv4.Name != ipv4.Name {
+		t.Fatalf("IPv4-mapped PTR name = %q, want %q", mappedIPv4.Name, ipv4.Name)
+	}
 	if _, _, _, err := BuildQuery("example.com", "PTR"); err == nil {
 		t.Fatal("PTR query accepted a non-IP input")
 	}

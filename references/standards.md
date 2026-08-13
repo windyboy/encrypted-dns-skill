@@ -11,6 +11,7 @@ standard, not on summaries or provider-specific JSON APIs.
 | DoH3 | [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) over [RFC 9114](https://www.rfc-editor.org/rfc/rfc9114.html) | Implemented |
 | DoT | [RFC 7858](https://www.rfc-editor.org/rfc/rfc7858.html) | Implemented |
 | DoT authentication profiles | [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html) | Strict privacy only |
+| DoT ALPN identifier | [IANA TLS ALPN registry](https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids) | Advertise `dot`; reject a different selection; permit and report no selection |
 | DoQ | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) | Implemented for single-response queries |
 | ODoH | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) | Research until a maintained implementation is selected |
 | DNS privacy operations | [RFC 8932](https://www.rfc-editor.org/rfc/rfc8932.html) | Security and privacy guidance |

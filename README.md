@@ -169,6 +169,8 @@ command and result contract.
 
 - DoH uses standard `application/dns-message` wire messages.
 - DoT verifies the PKIX certificate chain and configured authentication domain.
+- DoT advertises ALPN `dot`; an empty selection is accepted and reported, while
+  selection of a different application protocol is rejected.
 - DNSCrypt validates the resolver stamp, Ed25519-signed certificate, validity
   interval, provider identity, and encrypted response before accepting DNS data.
 - Plaintext fallback is prohibited.
@@ -188,6 +190,15 @@ go test -race ./...
 go vet ./...
 go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
 go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+python3 scripts/validate_skill.py .
+```
+
+Public endpoint interoperability tests are opt-in and skip cleanly when the
+host cannot reach the network:
+
+```bash
+EDNSDIAG_PUBLIC_INTEROP=1 go test ./internal/edns \
+  -run '^TestPublicCloudflareDo[HT]Interoperability$' -count=1 -v
 ```
 
 Protocol behavior must remain aligned with
