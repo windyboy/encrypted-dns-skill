@@ -1,0 +1,159 @@
+# Encrypted DNS Skill
+
+[![CI](https://github.com/windyboy/encrypted-dns-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/windyboy/encrypted-dns-skill/actions/workflows/ci.yml)
+
+An [Agent Skill](https://agentskills.io/specification) and deterministic Go CLI
+for querying and diagnosing encrypted DNS resolvers.
+
+The skill tells an agent when and how to perform encrypted DNS diagnostics;
+`ednsdiag` performs the protocol exchange. Agents do not need to construct DoH
+URLs, TLS sessions, or DNS wire messages themselves.
+
+## Status
+
+| Protocol | Status | Standard |
+| --- | --- | --- |
+| DNS over HTTPS (DoH) | Available (GET and POST) | [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) |
+| DNS over TLS (DoT) | Available (strict authentication) | [RFC 7858](https://www.rfc-editor.org/rfc/rfc7858.html), [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html) |
+| DNS over QUIC (DoQ) | Planned | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) |
+| DoH over HTTP/3 (DoH3) | Planned | RFC 8484 over HTTP/3 |
+| DNSCrypt | Planned | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) |
+| Oblivious DoH (ODoH) | Research | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) |
+| Anonymized DNSCrypt | Research | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) |
+
+Run `ednsdiag capabilities` instead of assuming a protocol is implemented.
+
+## Why a Skill and a CLI?
+
+- `SKILL.md` provides compact instructions, safety boundaries, and result
+  interpretation for an AI agent.
+- `ednsdiag` provides repeatable wire-format DNS, HTTP, TLS, input validation,
+  and structured JSON output.
+- Reference files keep protocol, provider, and security details grounded in
+  authoritative sources without bloating the agent's active context.
+
+The CLI never silently downgrades to plaintext DNS, and it does not connect to
+addresses returned in DNS answers.
+
+## Requirements
+
+- Go 1.26 or later when running or building from source
+- Network access to the selected encrypted DNS resolver
+- A host that supports the [Agent Skills package format](https://agentskills.io/specification) when using the repository as a Skill
+
+## Install the Skill
+
+Clone or copy this repository into a skill discovery directory supported by
+your agent host. Keep the repository layout intact so `SKILL.md`, `references/`,
+`schemas/`, and the Go source remain together.
+
+For example, in a host that discovers project-local skills from `.agents/skills`:
+
+```bash
+git clone https://github.com/windyboy/encrypted-dns-skill.git \
+  .agents/skills/encrypted-dns-skill
+```
+
+Discovery paths differ between hosts. Follow the host's documentation rather
+than moving only `SKILL.md`.
+
+## Run from Source
+
+No precompiled executable is required. Go can compile and run the command from
+the repository root:
+
+```bash
+go run ./cmd/ednsdiag capabilities
+go run ./cmd/ednsdiag query example.com A --protocol doh --provider cloudflare
+go run ./cmd/ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
+```
+
+The first run may download the modules pinned in `go.mod` and `go.sum`.
+
+To build a reusable local executable:
+
+```bash
+go build -o ./bin/ednsdiag ./cmd/ednsdiag
+./bin/ednsdiag capabilities
+```
+
+Do not download or execute an unverified third-party binary. This repository
+does not currently publish release binaries.
+
+## Usage
+
+```text
+ednsdiag capabilities
+ednsdiag version
+ednsdiag query <domain> [type] \
+  [--protocol doh|dot] \
+  [--provider cloudflare|google|quad9|adguard] \
+  [--method post|get] \
+  [--timeout 5s]
+```
+
+Defaults are `A`, `doh`, `cloudflare`, `post`, and `5s`. `--method` applies
+only to DoH. The timeout must be between `250ms` and `30s`.
+
+Built-in resolver profiles:
+
+| Provider | Profile |
+| --- | --- |
+| Cloudflare | Unfiltered |
+| Google | Unfiltered |
+| Quad9 | Security-filtered |
+| AdGuard | Ad- and security-filtered |
+
+Filtering policies can affect DNS answers. Results always identify the
+provider and profile used.
+
+## Result Semantics
+
+Every query returns structured JSON compatible with
+[`schemas/result-v1.schema.json`](schemas/result-v1.schema.json).
+
+- `completed: true` means the encrypted protocol exchange completed; it does
+  not mean the DNS response was `NOERROR`.
+- `dns.rcode` is the DNS result. `NXDOMAIN`, `SERVFAIL`, and `REFUSED` are DNS
+  outcomes, not transport failures.
+- Empty `dns.answers` with `NOERROR` means NODATA.
+- `transport.server_authenticated` reports resolver endpoint authentication.
+- `dns.resolver_reports_dnssec_authenticated` reflects the resolver's AD bit;
+  it is not local DNSSEC validation.
+- `transport.bootstrap: system_resolver` means the operating system resolver
+  was used to locate the encrypted resolver endpoint.
+
+## Security Model
+
+- DoH uses standard `application/dns-message` wire messages.
+- DoT verifies the PKIX certificate chain and configured authentication domain.
+- Plaintext fallback is prohibited.
+- DNS errors are not retried through another protocol as transport failures.
+- Provider and protocol results remain separate.
+- DNS answers are data only; the tool does not make application connections to
+  returned addresses.
+
+See [`references/security.md`](references/security.md) for the complete threat
+model and privacy boundaries.
+
+## Development
+
+```bash
+go test ./...
+go vet ./...
+```
+
+Protocol behavior must remain aligned with
+[`references/standards.md`](references/standards.md), provider changes with
+[`references/providers.md`](references/providers.md), and output with the v1
+JSON schema.
+
+## Scope
+
+This project targets client-to-recursive encrypted DNS diagnostics. It is not a
+system stub resolver, an authoritative DNS server, a hosted DNS record manager,
+or a zone-transfer tool.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
