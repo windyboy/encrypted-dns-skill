@@ -9,7 +9,7 @@ Use `ednsdiag` for encrypted DNS work. Do not assemble protocol requests with
 `curl`, `openssl`, or ad-hoc scripts when `ednsdiag` supports the operation.
 The executable requires network access.
 
-Prefer an installed `ednsdiag` executable. When it is unavailable and Go 1.26+
+Prefer an installed `ednsdiag` executable. When it is unavailable and Go 1.26.5+
 is installed, run the source from the skill root with:
 
 ```bash
@@ -77,6 +77,10 @@ each result independently.
   connection address; verify `resolver.authentication_name` and certificate
   metadata in the result.
 - Empty answers with `NOERROR` represent NODATA.
+- Treat truncated or non-representable answers as protocol failures; never
+  infer a partial result from an incomplete exchange.
+- For DoH and DoH3, `transport.http_age_seconds` is already subtracted from
+  answer TTLs when an HTTP cache reports an age.
 - A filtering resolver may synthesize `NXDOMAIN`; disclose the provider.
 
 ## References
