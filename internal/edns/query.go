@@ -33,7 +33,11 @@ func Query(ctx context.Context, options QueryOptions) Result {
 	result.Resolver = ResolverInfo{Provider: provider.ID, Profile: provider.Profile}
 	endpoint, err := provider.Endpoint(options.Protocol)
 	if err != nil {
-		result.Error = &ErrorInfo{Class: "input", Message: err.Error()}
+		class := "input"
+		if IsUnsupported(err) {
+			class = "unsupported"
+		}
+		result.Error = &ErrorInfo{Class: class, Message: err.Error()}
 		return result
 	}
 	result.Resolver.Endpoint = endpoint
@@ -74,5 +78,11 @@ func Query(ctx context.Context, options QueryOptions) Result {
 		return result
 	}
 	result.Completed = true
+	return result
+}
+
+func Probe(ctx context.Context, options QueryOptions) Result {
+	result := Query(ctx, options)
+	result.Operation = "probe"
 	return result
 }

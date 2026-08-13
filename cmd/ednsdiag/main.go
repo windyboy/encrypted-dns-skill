@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,20 @@ import (
 )
 
 const version = "0.1.0-dev"
+
+const (
+	exitSuccess     = 0
+	exitLocal       = 1
+	exitUsage       = 2
+	exitTransport   = 3
+	exitUnsupported = 4
+)
+
+var (
+	runQuery   = edns.Query
+	runProbe   = edns.Probe
+	runCompare = edns.Compare
+)
 
 type capability struct {
 	Protocol string `json:"protocol"`
@@ -68,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, version)
 		return 0
 
-	case "query":
+	case "query", "probe":
 		options, timeout, err := parseQueryArgs(args[1:])
 		if err != nil {
 			fmt.Fprintln(stderr, err)
@@ -77,21 +92,31 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		result := edns.Query(ctx, options)
+		var result edns.Result
+		if args[0] == "probe" {
+			result = runProbe(ctx, options)
+		} else {
+			result = runQuery(ctx, options)
+		}
 		if code := writeJSON(stdout, stderr, result); code != 0 {
 			return code
 		}
-		if result.Completed {
-			return 0
-		}
-		if result.Error != nil && result.Error.Class == "input" {
-			return 2
-		}
-		return 3
+		return resultExitCode(result.Completed, result.Error)
 
-	case "probe", "compare":
-		fmt.Fprintf(stderr, "%s is not implemented in %s; run ednsdiag capabilities\n", args[0], version)
-		return 4
+	case "compare":
+		options, timeout, err := parseCompareArgs(args[1:])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			writeCompareUsage(stderr)
+			return exitUsage
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		result := runCompare(ctx, options)
+		if code := writeJSON(stdout, stderr, result); code != 0 {
+			return code
+		}
+		return resultExitCode(result.Completed, result.Error)
 
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
@@ -151,8 +176,14 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 	if len(positionals) == 2 {
 		options.RecordType = strings.ToUpper(positionals[1])
 	}
-	if options.Protocol != "doh" && options.Protocol != "dot" && options.Protocol != "doq" && options.Protocol != "doh3" && options.Protocol != "dnscrypt" {
-		return options, 0, fmt.Errorf("protocol %q is not available", options.Protocol)
+	if !knownRecordType(options.RecordType) {
+		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
+	}
+	if !knownProtocol(options.Protocol) {
+		return options, 0, fmt.Errorf("unknown protocol %q", options.Protocol)
+	}
+	if _, err := edns.FindProvider(options.Provider); err != nil {
+		return options, 0, err
 	}
 	if options.Method != "get" && options.Method != "post" {
 		return options, 0, fmt.Errorf("DoH method must be get or post")
@@ -161,6 +192,155 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 		return options, 0, fmt.Errorf("--method applies only to DoH and DoH3")
 	}
 	return options, timeout, nil
+}
+
+func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error) {
+	options := edns.CompareOptions{RecordType: "A", AttemptTimeout: 5 * time.Second, MaxAttempts: 4}
+	totalTimeout := 30 * time.Second
+	positionals := make([]string, 0, 2)
+	seenTargets := map[string]bool{}
+
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if !strings.HasPrefix(argument, "--") {
+			positionals = append(positionals, argument)
+			continue
+		}
+		key, value, found := strings.Cut(strings.TrimPrefix(argument, "--"), "=")
+		if !found {
+			index++
+			if index >= len(args) {
+				return options, 0, fmt.Errorf("--%s requires a value", key)
+			}
+			value = args[index]
+		}
+		switch key {
+		case "target":
+			target, err := parseCompareTarget(value)
+			if err != nil {
+				return options, 0, err
+			}
+			identity := target.Protocol + ":" + target.Provider + ":" + target.Method
+			if seenTargets[identity] {
+				return options, 0, fmt.Errorf("duplicate comparison target %q", value)
+			}
+			seenTargets[identity] = true
+			options.Targets = append(options.Targets, target)
+		case "timeout":
+			parsed, err := time.ParseDuration(value)
+			if err != nil {
+				return options, 0, fmt.Errorf("invalid timeout %q: %w", value, err)
+			}
+			totalTimeout = parsed
+		case "attempt-timeout":
+			parsed, err := time.ParseDuration(value)
+			if err != nil {
+				return options, 0, fmt.Errorf("invalid attempt timeout %q: %w", value, err)
+			}
+			options.AttemptTimeout = parsed
+		case "max-attempts":
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return options, 0, fmt.Errorf("invalid max attempts %q", value)
+			}
+			options.MaxAttempts = parsed
+		default:
+			return options, 0, fmt.Errorf("unknown compare option --%s", key)
+		}
+	}
+
+	if len(positionals) < 1 || len(positionals) > 2 {
+		return options, 0, fmt.Errorf("compare requires a domain and optional record type")
+	}
+	options.Name = positionals[0]
+	if len(positionals) == 2 {
+		options.RecordType = strings.ToUpper(positionals[1])
+	}
+	if !knownRecordType(options.RecordType) {
+		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
+	}
+	if len(options.Targets) < 2 {
+		return options, 0, fmt.Errorf("compare requires at least two --target values")
+	}
+	if options.MaxAttempts < 2 || options.MaxAttempts > 8 {
+		return options, 0, fmt.Errorf("max attempts must be between 2 and 8")
+	}
+	if len(options.Targets) > options.MaxAttempts {
+		return options, 0, fmt.Errorf("comparison targets exceed max attempts")
+	}
+	if totalTimeout < 250*time.Millisecond || totalTimeout > 60*time.Second {
+		return options, 0, fmt.Errorf("compare timeout must be between 250ms and 60s")
+	}
+	if options.AttemptTimeout < 250*time.Millisecond || options.AttemptTimeout > 30*time.Second {
+		return options, 0, fmt.Errorf("attempt timeout must be between 250ms and 30s")
+	}
+	if options.AttemptTimeout > totalTimeout {
+		return options, 0, fmt.Errorf("attempt timeout cannot exceed compare timeout")
+	}
+	return options, totalTimeout, nil
+}
+
+func parseCompareTarget(value string) (edns.CompareTarget, error) {
+	parts := strings.Split(value, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return edns.CompareTarget{}, fmt.Errorf("target %q must be protocol:provider[:method]", value)
+	}
+	target := edns.CompareTarget{Protocol: strings.ToLower(parts[0]), Provider: strings.ToLower(parts[1]), Method: "post"}
+	if len(parts) == 3 {
+		target.Method = strings.ToLower(parts[2])
+	}
+	if !knownProtocol(target.Protocol) {
+		return target, fmt.Errorf("unknown protocol %q", target.Protocol)
+	}
+	if _, err := edns.FindProvider(target.Provider); err != nil {
+		return target, err
+	}
+	if target.Method != "get" && target.Method != "post" {
+		return target, fmt.Errorf("target method must be get or post")
+	}
+	if target.Protocol != "doh" && target.Protocol != "doh3" && target.Method != "post" {
+		return target, fmt.Errorf("GET method applies only to DoH and DoH3 targets")
+	}
+	return target, nil
+}
+
+func knownProtocol(protocol string) bool {
+	switch protocol {
+	case "doh", "dot", "doq", "doh3", "dnscrypt", "odoh", "anonymized-dnscrypt":
+		return true
+	default:
+		return false
+	}
+}
+
+func knownRecordType(recordType string) bool {
+	switch recordType {
+	case "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA", "SRV", "PTR", "HTTPS", "SVCB":
+		return true
+	default:
+		return false
+	}
+}
+
+func resultExitCode(completed bool, resultError *edns.ErrorInfo) int {
+	if completed {
+		return exitSuccess
+	}
+	if resultError == nil {
+		return exitLocal
+	}
+	switch resultError.Class {
+	case "internal":
+		return exitLocal
+	case "input":
+		return exitUsage
+	case "unsupported":
+		return exitUnsupported
+	case "transport", "protocol":
+		return exitTransport
+	default:
+		return exitLocal
+	}
 }
 
 func writeJSON(stdout, stderr io.Writer, value any) int {
@@ -178,5 +358,9 @@ func writeUsage(writer io.Writer) {
 }
 
 func writeQueryUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: ednsdiag query <domain> [type] [--protocol doh|dot|doq|doh3|dnscrypt] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--timeout 5s]")
+	fmt.Fprintln(writer, "usage: ednsdiag <query|probe> <domain> [type] [--protocol doh|dot|doq|doh3|dnscrypt|odoh|anonymized-dnscrypt] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--timeout 5s]")
+}
+
+func writeCompareUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: ednsdiag compare <domain> [type] --target protocol:provider[:method] --target protocol:provider[:method] [--attempt-timeout 5s] [--timeout 30s] [--max-attempts 4]")
 }

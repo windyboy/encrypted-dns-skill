@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "operation": "compare",
+  "completed": true,
+  "query": {
+    "name": "example.com",
+    "type": "A"
+  },
+  "attempts": [
+    {
+      "schema_version": 1,
+      "operation": "query",
+      "completed": true,
+      "query": {
+        "name": "example.com",
+        "type": "A"
+      },
+      "resolver": {
+        "provider": "cloudflare",
+        "endpoint": "cloudflare.example:443",
+        "profile": "test"
+      },
+      "transport": {
+        "protocol": "doh",
+        "encrypted": true,
+        "server_authenticated": true,
+        "elapsed_ms": 12,
+        "bootstrap": "test_fixture"
+      },
+      "dns": {
+        "rcode": "NOERROR",
+        "rcode_value": 0,
+        "resolver_reports_dnssec_authenticated": false,
+        "client_validated_dnssec": false,
+        "answers": [
+          {
+            "address": "203.0.113.10",
+            "name": "example.com",
+            "ttl": 60,
+            "type": "A"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": 1,
+      "operation": "query",
+      "completed": true,
+      "query": {
+        "name": "example.com",
+        "type": "A"
+      },
+      "resolver": {
+        "provider": "google",
+        "endpoint": "google.example:443",
+        "profile": "test"
+      },
+      "transport": {
+        "protocol": "dot",
+        "encrypted": true,
+        "server_authenticated": true,
+        "elapsed_ms": 12,
+        "bootstrap": "test_fixture"
+      },
+      "dns": {
+        "rcode": "NOERROR",
+        "rcode_value": 0,
+        "resolver_reports_dnssec_authenticated": false,
+        "client_validated_dnssec": false,
+        "answers": [
+          {
+            "address": "203.0.113.20",
+            "name": "example.com",
+            "ttl": 60,
+            "type": "A"
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "completed": 2,
+    "failed": 0,
+    "unsupported": 0
+  }
+}

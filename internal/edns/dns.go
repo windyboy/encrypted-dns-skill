@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/miekg/dns"
 	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/idna"
 )
@@ -24,18 +25,30 @@ var recordTypes = map[string]dnsmessage.Type{
 	"SRV":   dnsmessage.TypeSRV,
 	"SVCB":  dnsmessage.TypeSVCB,
 	"HTTPS": dnsmessage.TypeHTTPS,
+	"PTR":   dnsmessage.TypePTR,
 }
 
 func BuildQuery(name, recordType string) ([]byte, QueryInfo, uint16, error) {
-	canonical, err := canonicalName(name)
-	if err != nil {
-		return nil, QueryInfo{}, 0, err
-	}
-
 	typeName := strings.ToUpper(recordType)
 	qtype, ok := recordTypes[typeName]
 	if !ok {
 		return nil, QueryInfo{}, 0, fmt.Errorf("unsupported record type %q", recordType)
+	}
+
+	var canonical string
+	var err error
+	if typeName == "PTR" {
+		address := net.ParseIP(strings.TrimSpace(name))
+		if address == nil {
+			return nil, QueryInfo{}, 0, fmt.Errorf("PTR queries require an IPv4 or IPv6 address")
+		}
+		canonical, err = dns.ReverseAddr(address.String())
+		canonical = strings.TrimSuffix(canonical, ".")
+	} else {
+		canonical, err = canonicalName(name)
+	}
+	if err != nil {
+		return nil, QueryInfo{}, 0, err
 	}
 
 	dnsName, err := dnsmessage.NewName(canonical + ".")

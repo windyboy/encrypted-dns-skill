@@ -8,6 +8,7 @@ require (
 	github.com/ameshkov/dnscrypt/v2 v2.4.0
 	github.com/miekg/dns v1.1.72
 	github.com/quic-go/quic-go v0.61.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 )
 
 require (
