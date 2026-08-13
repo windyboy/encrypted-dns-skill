@@ -38,6 +38,8 @@ ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
 ednsdiag query example.com AAAA --protocol doq --provider adguard
 ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
 ednsdiag query example.com A --protocol dnscrypt --provider adguard
+ednsdiag probe example.com A --protocol dot --provider cloudflare
+ednsdiag compare example.com A --target doh:cloudflare --target dot:google
 ednsdiag capabilities
 ednsdiag version
 ```
@@ -45,8 +47,10 @@ ednsdiag version
 Use `--method get` or `--method post` only with DoH or DoH3. The default is POST.
 Built-in providers are `cloudflare`, `google`, `quad9`, and `adguard`. Provider
 protocol support and filtering policies differ and are included in the result.
-Run `capabilities` and do not infer an unsupported endpoint. `probe` and
-`compare` remain reserved until their capabilities are implemented.
+Run `capabilities` and do not infer an unsupported endpoint. `probe` executes
+one diagnostic query while labeling the operation for automation. `compare`
+requires two or more explicit `protocol:provider[:method]` targets and preserves
+each result independently.
 
 ## Required behavior
 
@@ -85,6 +89,8 @@ Run `capabilities` and do not infer an unsupported endpoint. `probe` and
   modifying a built-in provider.
 - Keep output compatible with
   [schemas/result-v1.schema.json](schemas/result-v1.schema.json).
+- Read [references/contracts.md](references/contracts.md) when integrating the
+  CLI with an agent or changing command, exit-code, or JSON behavior.
 
 ## Scope
 
