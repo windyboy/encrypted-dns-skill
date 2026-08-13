@@ -81,14 +81,12 @@ func exchangeDoQWithConfig(ctx context.Context, provider Provider, wire []byte, 
 	if err != nil {
 		return nil, info, fmt.Errorf("read DoQ response: %w", err)
 	}
-	var trailing [1]byte
-	if count, err := stream.Read(trailing[:]); err != io.EOF {
-		if err != nil {
-			return nil, info, fmt.Errorf("finish DoQ response stream: %w", err)
-		}
-		if count != 0 {
-			return nil, info, fmt.Errorf("DoQ server returned more than one DNS response")
-		}
+	trailing, err := io.ReadAll(io.LimitReader(stream, 1))
+	if err != nil {
+		return nil, info, fmt.Errorf("finish DoQ response stream: %w", err)
+	}
+	if len(trailing) != 0 {
+		return nil, info, fmt.Errorf("DoQ server returned more than one DNS response")
 	}
 	return response, info, nil
 }
