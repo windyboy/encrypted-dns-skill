@@ -26,6 +26,19 @@ require a DoT server on its dedicated port to select an ALPN protocol, so an
 empty negotiated ALPN is permitted and reported as empty. If a server selects
 a non-empty protocol other than `dot`, abort before sending the DNS query.
 
+## QUIC transport policy
+
+DoQ requires TLS 1.3 and an exact `doq` ALPN selection. DoH3 requires TLS 1.3,
+HTTP/3, and an exact `h3` ALPN selection. Certificate, authentication-domain,
+SNI, and ALPN failures abort before a DNS query is sent. The initial
+implementation does not send 0-RTT data or enable session resumption because
+their replay and linkability properties require a separate policy decision.
+
+Each DoQ query uses one client-initiated bidirectional stream, a two-octet
+length prefix, DNS Message ID 0, and STREAM FIN. Truncated frames, extra
+responses, non-zero response IDs, unexpected streams, and missing FIN are
+protocol failures; they never trigger plaintext or cross-protocol fallback.
+
 ## Bootstrap transparency
 
 Connecting to a resolver hostname may require an initial DNS lookup. Report
