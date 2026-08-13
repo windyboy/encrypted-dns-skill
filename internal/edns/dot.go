@@ -3,7 +3,6 @@ package edns
 import (
 	"context"
 	"crypto/tls"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -66,29 +65,10 @@ func exchangeDoTWithTLSConfig(ctx context.Context, provider Provider, wire []byt
 }
 
 func exchangeTCPFrame(connection io.ReadWriter, wire []byte) ([]byte, error) {
-	if len(wire) == 0 || len(wire) > maxDNSMessageSize {
-		return nil, fmt.Errorf("invalid DNS message length %d", len(wire))
-	}
-	frame := make([]byte, 2+len(wire))
-	binary.BigEndian.PutUint16(frame[:2], uint16(len(wire)))
-	copy(frame[2:], wire)
-	if err := writeAll(connection, frame); err != nil {
+	if err := writeDNSFrame(connection, wire); err != nil {
 		return nil, fmt.Errorf("write framed DNS query: %w", err)
 	}
-
-	var lengthBytes [2]byte
-	if _, err := io.ReadFull(connection, lengthBytes[:]); err != nil {
-		return nil, fmt.Errorf("read DNS response length: %w", err)
-	}
-	length := int(binary.BigEndian.Uint16(lengthBytes[:]))
-	if length == 0 {
-		return nil, fmt.Errorf("DoT server returned an empty DNS message")
-	}
-	response := make([]byte, length)
-	if _, err := io.ReadFull(connection, response); err != nil {
-		return nil, fmt.Errorf("read DNS response: %w", err)
-	}
-	return response, nil
+	return readDNSFrame(connection)
 }
 
 func writeAll(writer io.Writer, payload []byte) error {
