@@ -35,14 +35,17 @@ Only use a protocol when its reported status is `available`. Never describe a
 ```bash
 ednsdiag query example.com A --protocol doh --provider cloudflare
 ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
+ednsdiag query example.com AAAA --protocol doq --provider adguard
+ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
 ednsdiag capabilities
 ednsdiag version
 ```
 
-Use `--method get` or `--method post` only with DoH. The default is POST.
+Use `--method get` or `--method post` only with DoH or DoH3. The default is POST.
 Built-in providers are `cloudflare`, `google`, `quad9`, and `adguard`. Provider
-filtering policies differ and are included in the result. `probe` and `compare`
-remain reserved until their capabilities are implemented.
+protocol support and filtering policies differ and are included in the result.
+Run `capabilities` and do not infer an unsupported endpoint. `probe` and
+`compare` remain reserved until their capabilities are implemented.
 
 ## Required behavior
 
