@@ -69,6 +69,9 @@ go run ./cmd/ednsdiag query gmail.com MX --protocol dot --provider google --time
 go run ./cmd/ednsdiag query example.com AAAA --protocol doq --provider adguard
 go run ./cmd/ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
 go run ./cmd/ednsdiag query example.com A --protocol dnscrypt --provider adguard
+go run ./cmd/ednsdiag probe example.com A --protocol dot --provider cloudflare
+go run ./cmd/ednsdiag compare example.com A \
+  --target doh:cloudflare --target dot:google
 ```
 
 The first run may download the modules pinned in `go.mod` and `go.sum`.
@@ -89,14 +92,30 @@ does not currently publish release binaries.
 ednsdiag capabilities
 ednsdiag version
 ednsdiag query <domain> [type] \
-  [--protocol doh|dot|doq|doh3|dnscrypt] \
+  [--protocol doh|dot|doq|doh3|dnscrypt|odoh|anonymized-dnscrypt] \
   [--provider cloudflare|google|quad9|adguard] \
   [--method post|get] \
   [--timeout 5s]
+ednsdiag probe <domain> [type] [query options]
+ednsdiag compare <domain> [type] \
+  --target protocol:provider[:method] \
+  --target protocol:provider[:method] \
+  [--attempt-timeout 5s] [--timeout 30s] [--max-attempts 4]
 ```
 
 Defaults are `A`, `doh`, `cloudflare`, `post`, and `5s`. `--method` applies
 only to DoH and DoH3. The timeout must be between `250ms` and `30s`.
+Research protocols are accepted as inputs so automation receives a structured
+`unsupported` result and exit code `4`; they are never silently substituted.
+
+`compare` accepts 2–8 unique, allowlisted targets, bounded by `--max-attempts`.
+Its total timeout is `250ms`–`60s`; each attempt timeout is `250ms`–`30s` and
+cannot exceed the total. Comparison attempts run independently and answers are
+never merged.
+
+Supported record types are `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `SOA`,
+`CAA`, `SRV`, `PTR`, `HTTPS`, and `SVCB`. For `PTR`, pass an IP address; the CLI
+constructs the reverse name. Other IP literals and local names remain blocked.
 
 Built-in resolver profiles:
 
@@ -127,6 +146,20 @@ Every query returns structured JSON compatible with
   was used to locate the encrypted resolver endpoint.
 - DNSCrypt reports `bootstrap: stamp_ip`, the authenticated provider name,
   resolver certificate serial, and selected crypto construction.
+
+Human-readable usage errors go to stderr. Machine-readable operational results
+go to stdout. Stable exit codes are:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | The requested encrypted DNS operation completed; inspect `dns.rcode`. |
+| `1` | Local or internal failure. |
+| `2` | Invalid input or CLI usage. |
+| `3` | Transport or DNS protocol failure. |
+| `4` | Known but unsupported capability or provider/protocol combination. |
+
+See [`references/contracts.md`](references/contracts.md) for the complete v1
+command and result contract.
 
 ## Security Model
 
