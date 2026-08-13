@@ -1,9 +1,21 @@
 package edns
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+type UnsupportedError struct {
+	Message string
+}
+
+func (err *UnsupportedError) Error() string { return err.Message }
+
+func IsUnsupported(err error) bool {
+	var unsupported *UnsupportedError
+	return errors.As(err, &unsupported)
+}
 
 type Provider struct {
 	ID            string
@@ -67,10 +79,10 @@ func (provider Provider) Endpoint(protocol string) (string, error) {
 	case "dnscrypt":
 		endpoint = provider.DNSCryptStamp
 	default:
-		return "", fmt.Errorf("protocol %q is not available", protocol)
+		return "", &UnsupportedError{Message: fmt.Sprintf("protocol %q is not available", protocol)}
 	}
 	if endpoint == "" {
-		return "", fmt.Errorf("provider %q does not support protocol %q", provider.ID, protocol)
+		return "", &UnsupportedError{Message: fmt.Sprintf("provider %q does not support protocol %q", provider.ID, protocol)}
 	}
 	return endpoint, nil
 }
