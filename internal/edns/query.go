@@ -6,7 +6,13 @@ import (
 	"fmt"
 )
 
+type queryExchange func(context.Context, Provider, []byte, QueryOptions) ([]byte, TransportInfo, dnsCryptPeerInfo, error)
+
 func Query(ctx context.Context, options QueryOptions) Result {
+	return queryWithExchange(ctx, options, exchangeProtocol)
+}
+
+func queryWithExchange(ctx context.Context, options QueryOptions, exchange queryExchange) Result {
 	wire, query, transactionID, err := BuildQuery(options.Name, options.RecordType)
 	result := Result{
 		SchemaVersion: 1,
@@ -41,35 +47,21 @@ func Query(ctx context.Context, options QueryOptions) Result {
 		return result
 	}
 	result.Resolver.Endpoint = endpoint
-	if options.Protocol == "doq" {
+	if options.Protocol == "doh" || options.Protocol == "doh3" || options.Protocol == "doq" {
 		binary.BigEndian.PutUint16(wire[:2], 0)
 		transactionID = 0
 	}
 
-	var response []byte
-	switch options.Protocol {
-	case "doh":
-		response, result.Transport, err = exchangeDoH(ctx, provider, wire, options.Method)
-	case "dot":
-		response, result.Transport, err = exchangeDoT(ctx, provider, wire)
-	case "doq":
-		response, result.Transport, err = exchangeDoQ(ctx, provider, wire)
-	case "doh3":
-		response, result.Transport, err = exchangeDoH3(ctx, provider, wire, options.Method)
-	case "dnscrypt":
-		var peer dnsCryptPeerInfo
-		response, result.Transport, peer, err = exchangeDNSCrypt(ctx, provider.DNSCryptStamp, wire)
-		if err == nil {
-			result.Resolver.Endpoint = peer.ServerAddress
-			result.Resolver.AuthenticationName = peer.ProviderName
-			result.Resolver.CertificateSerial = peer.CertificateSerial
-		}
-	default:
-		err = fmt.Errorf("protocol %q is not available; run ednsdiag capabilities", options.Protocol)
-	}
+	response, transport, peer, err := exchange(ctx, provider, wire, options)
+	result.Transport = transport
 	if err != nil {
 		result.Error = &ErrorInfo{Class: "transport", Message: err.Error()}
 		return result
+	}
+	if options.Protocol == "dnscrypt" {
+		result.Resolver.Endpoint = peer.ServerAddress
+		result.Resolver.AuthenticationName = peer.ProviderName
+		result.Resolver.CertificateSerial = peer.CertificateSerial
 	}
 
 	result.DNS, err = ParseResponse(response, transactionID, query)
@@ -77,8 +69,31 @@ func Query(ctx context.Context, options QueryOptions) Result {
 		result.Error = &ErrorInfo{Class: "protocol", Message: err.Error()}
 		return result
 	}
+	applyHTTPAge(&result.DNS, result.Transport.HTTPAgeSeconds)
 	result.Completed = true
 	return result
+}
+
+func exchangeProtocol(ctx context.Context, provider Provider, wire []byte, options QueryOptions) ([]byte, TransportInfo, dnsCryptPeerInfo, error) {
+	var response []byte
+	var transport TransportInfo
+	var peer dnsCryptPeerInfo
+	var err error
+	switch options.Protocol {
+	case "doh":
+		response, transport, err = exchangeDoH(ctx, provider, wire, options.Method)
+	case "dot":
+		response, transport, err = exchangeDoT(ctx, provider, wire)
+	case "doq":
+		response, transport, err = exchangeDoQ(ctx, provider, wire)
+	case "doh3":
+		response, transport, err = exchangeDoH3(ctx, provider, wire, options.Method)
+	case "dnscrypt":
+		response, transport, peer, err = exchangeDNSCrypt(ctx, provider.DNSCryptStamp, wire)
+	default:
+		err = fmt.Errorf("protocol %q is not available; run ednsdiag capabilities", options.Protocol)
+	}
+	return response, transport, peer, err
 }
 
 func Probe(ctx context.Context, options QueryOptions) Result {
