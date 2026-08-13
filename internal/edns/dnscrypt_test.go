@@ -81,6 +81,55 @@ func TestExchangeDNSCrypt(t *testing.T) {
 	}
 }
 
+func TestDNSCryptTruncatedResponseIsRejected(t *testing.T) {
+	config, err := dnscrypt.GenerateResolverConfig("resolver.test", nil)
+	if err != nil {
+		t.Fatalf("generate DNSCrypt resolver config: %v", err)
+	}
+	cert, err := config.CreateCert()
+	if err != nil {
+		t.Fatalf("create DNSCrypt certificate: %v", err)
+	}
+	server := &dnscrypt.Server{
+		ProviderName: config.ProviderName,
+		ResolverCert: cert,
+		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Handler: dnsCryptHandlerFunc(func(writer dnscrypt.ResponseWriter, request *dns.Msg) error {
+			response := new(dns.Msg)
+			response.SetReply(request)
+			response.Truncated = true
+			return writer.WriteMsg(response)
+		}),
+	}
+	connection, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	if err != nil {
+		t.Fatalf("listen for DNSCrypt: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = connection.Close()
+		shutdownContext, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownContext)
+	})
+	go func() { _ = server.ServeUDP(connection) }()
+	stamp, err := config.CreateStamp(connection.LocalAddr().String())
+	if err != nil {
+		t.Fatalf("create DNSCrypt stamp: %v", err)
+	}
+
+	wire, query, transactionID, err := BuildQuery("example.com", "HTTPS")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	response, _, _, err := exchangeDNSCrypt(t.Context(), stamp.String(), wire)
+	if err != nil {
+		t.Fatalf("exchange DNSCrypt: %v", err)
+	}
+	if _, err := ParseResponse(response, transactionID, query); err == nil || !strings.Contains(err.Error(), "truncated") {
+		t.Fatalf("truncated DNSCrypt response error = %v", err)
+	}
+}
+
 func TestExchangeDNSCryptRejectsInvalidStamp(t *testing.T) {
 	wire, _, _, _ := BuildQuery("example.com", "A")
 	_, info, _, err := exchangeDNSCrypt(t.Context(), "sdns://not-a-valid-stamp", wire)
