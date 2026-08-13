@@ -34,11 +34,8 @@ func TestCapabilities(t *testing.T) {
 	for _, item := range result.Capabilities {
 		available[item.Protocol] = item.Status == "available"
 	}
-	if !available["doh"] || !available["dot"] || !available["doq"] || !available["doh3"] {
-		t.Fatalf("DoH, DoT, DoQ, and DoH3 must be available: %#v", available)
-	}
-	if available["dnscrypt"] {
-		t.Fatalf("planned transports must not be available: %#v", available)
+	if !available["doh"] || !available["dot"] || !available["doq"] || !available["doh3"] || !available["dnscrypt"] {
+		t.Fatalf("DoH, DoT, DoQ, DoH3, and DNSCrypt must be available: %#v", available)
 	}
 }
 
@@ -79,6 +76,16 @@ func TestParseQueryArgsAllowsQUICProtocols(t *testing.T) {
 				t.Fatalf("protocol = %q, want %q", options.Protocol, protocol)
 			}
 		})
+	}
+}
+
+func TestParseQueryArgsAllowsDNSCrypt(t *testing.T) {
+	options, _, err := parseQueryArgs([]string{"example.com", "A", "--protocol", "dnscrypt", "--provider", "adguard"})
+	if err != nil {
+		t.Fatalf("parse DNSCrypt query: %v", err)
+	}
+	if options.Protocol != "dnscrypt" || options.Provider != "adguard" {
+		t.Fatalf("unexpected DNSCrypt options: %#v", options)
 	}
 }
 

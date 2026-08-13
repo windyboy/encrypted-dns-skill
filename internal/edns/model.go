@@ -26,9 +26,11 @@ type QueryInfo struct {
 }
 
 type ResolverInfo struct {
-	Provider string `json:"provider"`
-	Endpoint string `json:"endpoint"`
-	Profile  string `json:"profile"`
+	Provider           string `json:"provider"`
+	Endpoint           string `json:"endpoint"`
+	Profile            string `json:"profile"`
+	AuthenticationName string `json:"authentication_name,omitempty"`
+	CertificateSerial  uint32 `json:"certificate_serial,omitempty"`
 }
 
 type TransportInfo struct {
@@ -41,6 +43,7 @@ type TransportInfo struct {
 	ALPN                string `json:"alpn,omitempty"`
 	HTTPVersion         string `json:"http_version,omitempty"`
 	QUICVersion         string `json:"quic_version,omitempty"`
+	CryptoConstruction  string `json:"crypto_construction,omitempty"`
 }
 
 type DNSInfo struct {

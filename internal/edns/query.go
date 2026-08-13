@@ -52,6 +52,14 @@ func Query(ctx context.Context, options QueryOptions) Result {
 		response, result.Transport, err = exchangeDoQ(ctx, provider, wire)
 	case "doh3":
 		response, result.Transport, err = exchangeDoH3(ctx, provider, wire, options.Method)
+	case "dnscrypt":
+		var peer dnsCryptPeerInfo
+		response, result.Transport, peer, err = exchangeDNSCrypt(ctx, provider.DNSCryptStamp, wire)
+		if err == nil {
+			result.Resolver.Endpoint = peer.ServerAddress
+			result.Resolver.AuthenticationName = peer.ProviderName
+			result.Resolver.CertificateSerial = peer.CertificateSerial
+		}
 	default:
 		err = fmt.Errorf("protocol %q is not available; run ednsdiag capabilities", options.Protocol)
 	}

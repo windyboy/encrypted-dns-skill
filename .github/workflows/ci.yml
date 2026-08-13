@@ -48,5 +48,10 @@ jobs:
         run: go mod download
       - name: Test
         run: go test ./...
+      - name: DNSCrypt interoperability
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          EDNSDIAG_DNSCRYPT_INTEROP: "1"
+        run: go test ./internal/edns -run '^TestDNSCryptAdGuardInteroperability$' -count=1
       - name: Vet
         run: go vet ./...

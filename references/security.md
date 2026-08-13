@@ -21,10 +21,9 @@ validation, fallback, or result claims.
 
 ## DoT ALPN policy
 
-The client advertises the `dot` ALPN identifier. RFC 7858 and RFC 8310 do not
-require a DoT server on its dedicated port to select an ALPN protocol, so an
-empty negotiated ALPN is permitted and reported as empty. If a server selects
-a non-empty protocol other than `dot`, abort before sending the DNS query.
+The client advertises the `dot` ALPN identifier and requires the server to
+select it. A missing or different ALPN is a hard failure before the DNS query
+is sent. This is the repository's strict authentication policy.
 
 ## QUIC transport policy
 
@@ -38,6 +37,15 @@ Each DoQ query uses one client-initiated bidirectional stream, a two-octet
 length prefix, DNS Message ID 0, and STREAM FIN. Truncated frames, extra
 responses, non-zero response IDs, unexpected streams, and missing FIN are
 protocol failures; they never trigger plaintext or cross-protocol fallback.
+
+## DNSCrypt transport policy
+
+Accept only allowlisted DNSCrypt v2 stamps. Validate the stamp type, provider
+public key, provider name, resolver certificate signature, validity interval,
+and encrypted response. Report the stamp IP bootstrap path, provider
+authentication name, certificate serial, and crypto construction. Certificate
+or response-authentication failures are hard failures and never trigger
+plaintext or cross-protocol fallback. Anonymized DNSCrypt remains unavailable.
 
 ## Bootstrap transparency
 

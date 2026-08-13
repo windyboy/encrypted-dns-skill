@@ -37,6 +37,7 @@ ednsdiag query example.com A --protocol doh --provider cloudflare
 ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
 ednsdiag query example.com AAAA --protocol doq --provider adguard
 ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
+ednsdiag query example.com A --protocol dnscrypt --provider adguard
 ednsdiag capabilities
 ednsdiag version
 ```
@@ -68,6 +69,9 @@ Run `capabilities` and do not infer an unsupported endpoint. `probe` and
 - Read `transport.server_authenticated` separately from DNSSEC fields.
 - Read `transport.bootstrap`; `system_resolver` means resolving the encrypted
   resolver endpoint itself used the operating system resolver.
+- For DNSCrypt, `stamp_ip` means the authenticated resolver stamp supplied the
+  connection address; verify `resolver.authentication_name` and certificate
+  metadata in the result.
 - Empty answers with `NOERROR` represent NODATA.
 - A filtering resolver may synthesize `NXDOMAIN`; disclose the provider.
 

@@ -22,7 +22,9 @@
       "properties": {
         "provider": { "type": "string" },
         "endpoint": { "type": "string" },
-        "profile": { "type": "string" }
+        "profile": { "type": "string" },
+        "authentication_name": { "type": "string" },
+        "certificate_serial": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -38,7 +40,8 @@
         "tls_version": { "type": "string" },
         "alpn": { "type": "string" },
         "http_version": { "type": "string" },
-        "quic_version": { "type": "string" }
+        "quic_version": { "type": "string" },
+        "crypto_construction": { "type": "string" }
       },
       "additionalProperties": true
     },

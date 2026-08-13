@@ -15,10 +15,11 @@ standard, not on summaries or provider-specific JSON APIs.
 | ODoH | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) | Research until a maintained implementation is selected |
 | DNS privacy operations | [RFC 8932](https://www.rfc-editor.org/rfc/rfc8932.html) | Security and privacy guidance |
 | EDNS(0) padding | [RFC 7830](https://www.rfc-editor.org/rfc/rfc7830.html) and [RFC 8467](https://www.rfc-editor.org/rfc/rfc8467.html) | Evaluate per transport |
-| DNSCrypt | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) | Planned, non-IETF |
+| DNSCrypt | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) | DNSCrypt v2 implemented over UDP; non-IETF |
 | Anonymized DNSCrypt | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) | Research |
 | Go DNS wire and IDNA support | [Go x/net module](https://pkg.go.dev/golang.org/x/net) | Pinned to v0.58.0; use `dnsmessage` and `idna` |
 | Go QUIC and HTTP/3 support | [quic-go documentation](https://quic-go.net/docs/) | Pinned to v0.61.0 |
+| Go DNSCrypt support | [ameshkov/dnscrypt](https://github.com/ameshkov/dnscrypt) | Pinned to v2.4.0; stamp, certificate, and protocol implementation |
 
 ## Deliberate exclusions
 
@@ -45,3 +46,8 @@ For DoQ, use ALPN `doq`, UDP port 853, a separate client-initiated bidirectional
 stream per query, the two-octet DNS-over-TCP length field, STREAM FIN, and DNS
 Message ID 0. DoH3 retains RFC 8484 message and HTTP semantics and requires
 HTTP/3 with ALPN `h3`.
+
+For DNSCrypt v2, parse only DNSCrypt stamps, fetch the provider TXT
+certificate, validate its Ed25519 signature and validity interval against the
+stamp key, and authenticate encrypted responses. The stamp-supplied provider
+name and IP endpoint are part of the authenticated resolver identity.

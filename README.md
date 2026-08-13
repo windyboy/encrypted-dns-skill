@@ -17,7 +17,7 @@ URLs, TLS sessions, or DNS wire messages themselves.
 | DNS over TLS (DoT) | Available (strict authentication) | [RFC 7858](https://www.rfc-editor.org/rfc/rfc7858.html), [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html) |
 | DNS over QUIC (DoQ) | Available | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) |
 | DoH over HTTP/3 (DoH3) | Available (GET and POST) | RFC 8484 over HTTP/3 |
-| DNSCrypt | Planned | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) |
+| DNSCrypt | Available (v2 over UDP) | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) |
 | Oblivious DoH (ODoH) | Research | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) |
 | Anonymized DNSCrypt | Research | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) |
 
@@ -68,6 +68,7 @@ go run ./cmd/ednsdiag query example.com A --protocol doh --provider cloudflare
 go run ./cmd/ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
 go run ./cmd/ednsdiag query example.com AAAA --protocol doq --provider adguard
 go run ./cmd/ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
+go run ./cmd/ednsdiag query example.com A --protocol dnscrypt --provider adguard
 ```
 
 The first run may download the modules pinned in `go.mod` and `go.sum`.
@@ -88,7 +89,7 @@ does not currently publish release binaries.
 ednsdiag capabilities
 ednsdiag version
 ednsdiag query <domain> [type] \
-  [--protocol doh|dot|doq|doh3] \
+  [--protocol doh|dot|doq|doh3|dnscrypt] \
   [--provider cloudflare|google|quad9|adguard] \
   [--method post|get] \
   [--timeout 5s]
@@ -99,12 +100,12 @@ only to DoH and DoH3. The timeout must be between `250ms` and `30s`.
 
 Built-in resolver profiles:
 
-| Provider | Profile | DoH | DoT | DoQ | DoH3 |
-| --- | --- | --- | --- | --- | --- |
-| Cloudflare | Unfiltered | Yes | Yes | No | Yes |
-| Google | Unfiltered | Yes | Yes | No | Yes |
-| Quad9 | Security-filtered | Yes | Yes | No | No |
-| AdGuard | Ad- and security-filtered | Yes | Yes | Yes | No |
+| Provider | Profile | DoH | DoT | DoQ | DoH3 | DNSCrypt |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cloudflare | Unfiltered | Yes | Yes | No | Yes | No |
+| Google | Unfiltered | Yes | Yes | No | Yes | No |
+| Quad9 | Security-filtered | Yes | Yes | No | No | No |
+| AdGuard | Ad- and security-filtered | Yes | Yes | Yes | No | Yes |
 
 Filtering policies can affect DNS answers. Results always identify the
 provider and profile used.
@@ -124,11 +125,15 @@ Every query returns structured JSON compatible with
   it is not local DNSSEC validation.
 - `transport.bootstrap: system_resolver` means the operating system resolver
   was used to locate the encrypted resolver endpoint.
+- DNSCrypt reports `bootstrap: stamp_ip`, the authenticated provider name,
+  resolver certificate serial, and selected crypto construction.
 
 ## Security Model
 
 - DoH uses standard `application/dns-message` wire messages.
 - DoT verifies the PKIX certificate chain and configured authentication domain.
+- DNSCrypt validates the resolver stamp, Ed25519-signed certificate, validity
+  interval, provider identity, and encrypted response before accepting DNS data.
 - Plaintext fallback is prohibited.
 - DNS errors are not retried through another protocol as transport failures.
 - Provider and protocol results remain separate.

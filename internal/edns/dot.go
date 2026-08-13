@@ -51,7 +51,7 @@ func exchangeDoTWithTLSConfig(ctx context.Context, provider Provider, wire []byt
 	info.ServerAuthenticated = true
 	info.TLSVersion = tlsVersionName(state.Version)
 	info.ALPN = state.NegotiatedProtocol
-	if info.ALPN != "" && info.ALPN != "dot" {
+	if info.ALPN != "dot" {
 		info.ElapsedMS = time.Since(started).Milliseconds()
 		return nil, info, fmt.Errorf("DoT server negotiated unexpected ALPN protocol %q", info.ALPN)
 	}
