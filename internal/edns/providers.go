@@ -6,14 +6,15 @@ import (
 )
 
 type Provider struct {
-	ID      string
-	Profile string
-	DoHURL  string
-	DoTAddr string
-	DoTName string
-	DoQAddr string
-	DoQName string
-	DoH3URL string
+	ID            string
+	Profile       string
+	DoHURL        string
+	DoTAddr       string
+	DoTName       string
+	DoQAddr       string
+	DoQName       string
+	DoH3URL       string
+	DNSCryptStamp string
 }
 
 var providers = map[string]Provider{
@@ -41,13 +42,14 @@ var providers = map[string]Provider{
 		DoTName: "dns.quad9.net",
 	},
 	"adguard": {
-		ID:      "adguard",
-		Profile: "ad-and-security-filtered",
-		DoHURL:  "https://dns.adguard-dns.com/dns-query",
-		DoTAddr: "dns.adguard-dns.com:853",
-		DoTName: "dns.adguard-dns.com",
-		DoQAddr: "dns.adguard-dns.com:853",
-		DoQName: "dns.adguard-dns.com",
+		ID:            "adguard",
+		Profile:       "ad-and-security-filtered",
+		DoHURL:        "https://dns.adguard-dns.com/dns-query",
+		DoTAddr:       "dns.adguard-dns.com:853",
+		DoTName:       "dns.adguard-dns.com",
+		DoQAddr:       "dns.adguard-dns.com:853",
+		DoQName:       "dns.adguard-dns.com",
+		DNSCryptStamp: "sdns://AQMAAAAAAAAAETk0LjE0MC4xNC4xNDo1NDQzINErR_JS3PLCu_iZEIbq95zkSV2LFsigxDIuUso_OQhzIjIuZG5zY3J5cHQuZGVmYXVsdC5uczEuYWRndWFyZC5jb20",
 	},
 }
 
@@ -62,6 +64,8 @@ func (provider Provider) Endpoint(protocol string) (string, error) {
 		endpoint = provider.DoQAddr
 	case "doh3":
 		endpoint = provider.DoH3URL
+	case "dnscrypt":
+		endpoint = provider.DNSCryptStamp
 	default:
 		return "", fmt.Errorf("protocol %q is not available", protocol)
 	}
