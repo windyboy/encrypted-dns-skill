@@ -55,8 +55,8 @@ func newDoH3Client(endpoint string, tlsConfig *tls.Config) (*http.Client, *http3
 
 	capture := &quicStateCapture{}
 	transport := &http3.Transport{
-		TLSClientConfig:       tlsConfig,
-		QUICConfig:            &quic.Config{HandshakeIdleTimeout: 5 * time.Second, MaxIdleTimeout: 10 * time.Second},
+		TLSClientConfig:        tlsConfig,
+		QUICConfig:             &quic.Config{HandshakeIdleTimeout: 5 * time.Second, MaxIdleTimeout: 10 * time.Second},
 		MaxResponseHeaderBytes: 64 << 10,
 		DisableCompression:     true,
 		Dial: func(ctx context.Context, address string, tlsConfig *tls.Config, config *quic.Config) (*quic.Conn, error) {
