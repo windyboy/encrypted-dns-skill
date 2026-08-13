@@ -50,9 +50,13 @@ func newDoHClient(endpoint string) *http.Client {
 }
 
 func exchangeDoHWithClient(ctx context.Context, client *http.Client, endpoint string, wire []byte, method string) ([]byte, TransportInfo, error) {
+	return exchangeHTTPSDNSWithClient(ctx, client, endpoint, wire, method, "doh")
+}
+
+func exchangeHTTPSDNSWithClient(ctx context.Context, client *http.Client, endpoint string, wire []byte, method, protocol string) ([]byte, TransportInfo, error) {
 	started := time.Now()
 	info := TransportInfo{
-		Protocol:  "doh",
+		Protocol:  protocol,
 		Encrypted: true,
 		Bootstrap: "system_resolver",
 	}
@@ -100,6 +104,14 @@ func exchangeDoHWithClient(ctx context.Context, client *http.Client, endpoint st
 	info.ServerAuthenticated = true
 	info.TLSVersion = tlsVersionName(response.TLS.Version)
 	info.ALPN = response.TLS.NegotiatedProtocol
+	if protocol == "doh3" {
+		if response.ProtoMajor != 3 {
+			return nil, info, fmt.Errorf("DoH3 server used unexpected HTTP version %q", response.Proto)
+		}
+		if info.ALPN != "h3" {
+			return nil, info, fmt.Errorf("DoH3 server negotiated unexpected ALPN protocol %q", info.ALPN)
+		}
+	}
 
 	if response.StatusCode < 200 || response.StatusCode > 299 {
 		return nil, info, fmt.Errorf("DoH server returned HTTP status %d", response.StatusCode)
