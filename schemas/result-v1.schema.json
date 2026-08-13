@@ -1,24 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/windyboy/encrypted-dns-skill/schemas/result-v1.schema.json",
-  "title": "Encrypted DNS diagnostic result",
-  "type": "object",
-  "required": ["schema_version", "operation", "completed", "query", "transport", "dns"],
-  "properties": {
-    "schema_version": { "const": 1 },
-    "operation": { "enum": ["query", "probe", "compare"] },
-    "completed": { "type": "boolean" },
+  "title": "Encrypted DNS diagnostic result v1",
+  "oneOf": [
+    { "$ref": "#/$defs/singleResult" },
+    { "$ref": "#/$defs/compareResult" }
+  ],
+  "$defs": {
     "query": {
       "type": "object",
       "required": ["name", "type"],
       "properties": {
         "name": { "type": "string" },
-        "type": { "type": "string" }
+        "type": { "enum": ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA", "SRV", "PTR", "HTTPS", "SVCB"] }
       },
       "additionalProperties": false
     },
     "resolver": {
       "type": "object",
+      "required": ["provider", "endpoint", "profile"],
       "properties": {
         "provider": { "type": "string" },
         "endpoint": { "type": "string" },
@@ -30,7 +30,7 @@
     },
     "transport": {
       "type": "object",
-      "required": ["protocol", "encrypted", "server_authenticated"],
+      "required": ["protocol", "encrypted", "server_authenticated", "elapsed_ms", "bootstrap"],
       "properties": {
         "protocol": { "enum": ["doh", "dot", "doq", "doh3", "dnscrypt", "odoh", "anonymized-dnscrypt"] },
         "encrypted": { "type": "boolean" },
@@ -43,44 +43,223 @@
         "quic_version": { "type": "string" },
         "crypto_construction": { "type": "string" }
       },
-      "additionalProperties": true
+      "additionalProperties": false
+    },
+    "answerBaseProperties": {
+      "name": { "type": "string" },
+      "ttl": { "type": "integer", "minimum": 0 }
+    },
+    "addressAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "address"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "enum": ["A", "AAAA"] },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "address": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "targetAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "target"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "enum": ["CNAME", "PTR"] },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "mxAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "priority", "exchange"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "MX" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "exchange": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "txtAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "strings"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "TXT" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "strings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "nsAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "host"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "NS" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "host": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "soaAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "primary_ns", "responsible_mailbox", "serial", "refresh", "retry", "expire", "minimum_ttl"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "SOA" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "primary_ns": { "type": "string" },
+        "responsible_mailbox": { "type": "string" },
+        "serial": { "type": "integer", "minimum": 0 },
+        "refresh": { "type": "integer", "minimum": 0 },
+        "retry": { "type": "integer", "minimum": 0 },
+        "expire": { "type": "integer", "minimum": 0 },
+        "minimum_ttl": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "caaAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "flags", "tag", "value"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "CAA" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "flags": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "tag": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "srvAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "priority", "weight", "port", "target"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "const": "SRV" },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "weight": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "svcbParam": {
+      "type": "object",
+      "required": ["key", "key_value", "value_base64"],
+      "properties": {
+        "key": { "type": "string" },
+        "key_value": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "value_base64": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "svcbAnswer": {
+      "type": "object",
+      "required": ["name", "type", "ttl", "priority", "target", "params"],
+      "properties": {
+        "name": { "$ref": "#/$defs/answerBaseProperties/name" },
+        "type": { "enum": ["SVCB", "HTTPS"] },
+        "ttl": { "$ref": "#/$defs/answerBaseProperties/ttl" },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "target": { "type": "string" },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/svcbParam" } }
+      },
+      "additionalProperties": false
+    },
+    "answer": {
+      "oneOf": [
+        { "$ref": "#/$defs/addressAnswer" },
+        { "$ref": "#/$defs/targetAnswer" },
+        { "$ref": "#/$defs/mxAnswer" },
+        { "$ref": "#/$defs/txtAnswer" },
+        { "$ref": "#/$defs/nsAnswer" },
+        { "$ref": "#/$defs/soaAnswer" },
+        { "$ref": "#/$defs/caaAnswer" },
+        { "$ref": "#/$defs/srvAnswer" },
+        { "$ref": "#/$defs/svcbAnswer" }
+      ]
     },
     "dns": {
       "type": "object",
-      "required": ["rcode", "rcode_value", "answers"],
+      "required": ["rcode", "rcode_value", "resolver_reports_dnssec_authenticated", "client_validated_dnssec", "answers"],
       "properties": {
         "rcode": { "type": "string" },
         "rcode_value": { "type": "integer", "minimum": 0 },
         "resolver_reports_dnssec_authenticated": { "type": "boolean" },
-        "client_validated_dnssec": { "type": "boolean" },
-        "answers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["name", "type", "ttl"],
-            "properties": {
-              "name": { "type": "string" },
-              "type": { "type": "string" },
-              "ttl": { "type": "integer", "minimum": 0 }
-            },
-            "additionalProperties": true
-          }
-        }
+        "client_validated_dnssec": { "const": false },
+        "answers": { "type": "array", "items": { "$ref": "#/$defs/answer" } }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
-    "fallback_used": { "type": "boolean" },
-    "attempts": { "type": "array", "items": { "type": "object" } },
-    "warnings": { "type": "array", "items": { "type": "string" } },
     "error": {
       "type": "object",
       "required": ["class", "message"],
       "properties": {
-        "class": { "enum": ["input", "transport", "protocol", "internal"] },
+        "class": { "enum": ["input", "transport", "protocol", "unsupported", "internal"] },
         "message": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "singleResult": {
+      "type": "object",
+      "required": ["schema_version", "operation", "completed", "query", "resolver", "transport", "dns"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "operation": { "enum": ["query", "probe"] },
+        "completed": { "type": "boolean" },
+        "query": { "$ref": "#/$defs/query" },
+        "resolver": { "$ref": "#/$defs/resolver" },
+        "transport": { "$ref": "#/$defs/transport" },
+        "dns": { "$ref": "#/$defs/dns" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "error": { "$ref": "#/$defs/error" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "completed": { "const": true } }, "required": ["completed"] },
+          "then": { "not": { "required": ["error"] } },
+          "else": { "required": ["error"] }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "completed", "failed", "unsupported"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "compareResult": {
+      "type": "object",
+      "required": ["schema_version", "operation", "completed", "query", "attempts", "summary"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "operation": { "const": "compare" },
+        "completed": { "type": "boolean" },
+        "query": { "$ref": "#/$defs/query" },
+        "attempts": { "type": "array", "items": { "$ref": "#/$defs/singleResult" }, "maxItems": 8 },
+        "summary": { "$ref": "#/$defs/summary" },
+        "error": { "$ref": "#/$defs/error" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "completed": { "const": true } }, "required": ["completed"] },
+          "then": { "not": { "required": ["error"] } },
+          "else": { "required": ["error"] }
+        }
+      ],
+      "additionalProperties": false
     }
-  },
-  "additionalProperties": true
+  }
 }
