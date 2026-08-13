@@ -3,6 +3,7 @@ package edns
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -41,23 +42,31 @@ func compareWithQuery(ctx context.Context, options CompareOptions, queryFunc fun
 	}
 
 	result.Summary.Total = len(options.Targets)
-	for _, target := range options.Targets {
-		if err := ctx.Err(); err != nil {
-			attempt := failedCompareAttempt(query, target, "transport", fmt.Sprintf("compare context: %v", err))
-			result.Attempts = append(result.Attempts, attempt)
-			result.Summary.Failed++
-			continue
-		}
-		attemptContext, cancel := context.WithTimeout(ctx, options.AttemptTimeout)
-		attempt := queryFunc(attemptContext, QueryOptions{
-			Name:       options.Name,
-			RecordType: options.RecordType,
-			Protocol:   target.Protocol,
-			Provider:   target.Provider,
-			Method:     target.Method,
-		})
-		cancel()
-		result.Attempts = append(result.Attempts, attempt)
+	if err := ctx.Err(); err != nil {
+		result.Error = &ErrorInfo{Class: "transport", Message: fmt.Sprintf("compare context: %v", err)}
+		return result
+	}
+
+	result.Attempts = make([]Result, len(options.Targets))
+	var waitGroup sync.WaitGroup
+	for index, target := range options.Targets {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			attemptContext, cancel := context.WithTimeout(ctx, options.AttemptTimeout)
+			defer cancel()
+			result.Attempts[index] = queryFunc(attemptContext, QueryOptions{
+				Name:       options.Name,
+				RecordType: options.RecordType,
+				Protocol:   target.Protocol,
+				Provider:   target.Provider,
+				Method:     target.Method,
+			})
+		}()
+	}
+	waitGroup.Wait()
+
+	for _, attempt := range result.Attempts {
 		if attempt.Completed {
 			result.Summary.Completed++
 		} else {
@@ -76,18 +85,6 @@ func compareWithQuery(ctx context.Context, options CompareOptions, queryFunc fun
 	return result
 }
 
-func failedCompareAttempt(query QueryInfo, target CompareTarget, class, message string) Result {
-	return Result{
-		SchemaVersion: 1,
-		Operation:     "query",
-		Query:         query,
-		Resolver:      ResolverInfo{Provider: target.Provider},
-		Transport:     TransportInfo{Protocol: target.Protocol, Encrypted: true},
-		DNS:           DNSInfo{Answers: []AnswerRecord{}},
-		Error:         &ErrorInfo{Class: class, Message: message},
-	}
-}
-
 func compareFailureClass(attempts []Result) string {
 	classes := map[string]bool{}
 	for _, attempt := range attempts {
@@ -95,7 +92,7 @@ func compareFailureClass(attempts []Result) string {
 			classes[attempt.Error.Class] = true
 		}
 	}
-	for _, class := range []string{"internal", "unsupported", "input", "transport", "protocol"} {
+	for _, class := range []string{"internal", "input", "transport", "protocol", "unsupported"} {
 		if classes[class] {
 			return class
 		}
