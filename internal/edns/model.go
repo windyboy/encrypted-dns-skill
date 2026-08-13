@@ -75,6 +75,7 @@ type TransportInfo struct {
 	TLSVersion          string `json:"tls_version,omitempty"`
 	ALPN                string `json:"alpn,omitempty"`
 	HTTPVersion         string `json:"http_version,omitempty"`
+	HTTPAgeSeconds      int64  `json:"http_age_seconds,omitempty"`
 	QUICVersion         string `json:"quic_version,omitempty"`
 	CryptoConstruction  string `json:"crypto_construction,omitempty"`
 }
