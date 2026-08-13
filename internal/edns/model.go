@@ -1,11 +1,27 @@
 package edns
 
+import "time"
+
 type QueryOptions struct {
 	Name       string
 	RecordType string
 	Protocol   string
 	Provider   string
 	Method     string
+}
+
+type CompareTarget struct {
+	Protocol string `json:"protocol"`
+	Provider string `json:"provider"`
+	Method   string `json:"method,omitempty"`
+}
+
+type CompareOptions struct {
+	Name           string
+	RecordType     string
+	Targets        []CompareTarget
+	AttemptTimeout time.Duration
+	MaxAttempts    int
 }
 
 type Result struct {
@@ -18,6 +34,23 @@ type Result struct {
 	DNS           DNSInfo       `json:"dns"`
 	Warnings      []string      `json:"warnings,omitempty"`
 	Error         *ErrorInfo    `json:"error,omitempty"`
+}
+
+type CompareResult struct {
+	SchemaVersion int            `json:"schema_version"`
+	Operation     string         `json:"operation"`
+	Completed     bool           `json:"completed"`
+	Query         QueryInfo      `json:"query"`
+	Attempts      []Result       `json:"attempts"`
+	Summary       CompareSummary `json:"summary"`
+	Error         *ErrorInfo     `json:"error,omitempty"`
+}
+
+type CompareSummary struct {
+	Total       int `json:"total"`
+	Completed   int `json:"completed"`
+	Failed      int `json:"failed"`
+	Unsupported int `json:"unsupported"`
 }
 
 type QueryInfo struct {
