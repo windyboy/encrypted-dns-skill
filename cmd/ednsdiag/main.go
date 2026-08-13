@@ -51,8 +51,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			Capabilities: []capability{
 				{Protocol: "doh", Status: "available", Standard: "RFC 8484", Note: "RFC wire format over HTTP GET or POST"},
 				{Protocol: "dot", Status: "available", Standard: "RFC 7858 and RFC 8310", Note: "strict PKIX and authentication-domain validation"},
-				{Protocol: "doq", Status: "planned", Standard: "RFC 9250"},
-				{Protocol: "doh3", Status: "planned", Standard: "RFC 8484 over HTTP/3"},
+				{Protocol: "doq", Status: "available", Standard: "RFC 9250", Note: "RFC wire format over dedicated QUIC streams"},
+				{Protocol: "doh3", Status: "available", Standard: "RFC 8484 over HTTP/3", Note: "RFC wire format over HTTP/3 GET or POST"},
 				{Protocol: "dnscrypt", Status: "planned", Standard: "DNSCrypt protocol specification"},
 				{Protocol: "odoh", Status: "research", Standard: "RFC 9230", Note: "No maintained Go dependency has been selected."},
 				{Protocol: "anonymized-dnscrypt", Status: "research", Standard: "Anonymized DNSCrypt specification"},
@@ -151,14 +151,14 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 	if len(positionals) == 2 {
 		options.RecordType = strings.ToUpper(positionals[1])
 	}
-	if options.Protocol != "doh" && options.Protocol != "dot" {
+	if options.Protocol != "doh" && options.Protocol != "dot" && options.Protocol != "doq" && options.Protocol != "doh3" {
 		return options, 0, fmt.Errorf("protocol %q is not available", options.Protocol)
 	}
 	if options.Method != "get" && options.Method != "post" {
 		return options, 0, fmt.Errorf("DoH method must be get or post")
 	}
-	if options.Protocol == "dot" && options.Method != "post" {
-		return options, 0, fmt.Errorf("--method applies only to DoH")
+	if options.Protocol != "doh" && options.Protocol != "doh3" && options.Method != "post" {
+		return options, 0, fmt.Errorf("--method applies only to DoH and DoH3")
 	}
 	return options, timeout, nil
 }
@@ -178,5 +178,5 @@ func writeUsage(writer io.Writer) {
 }
 
 func writeQueryUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: ednsdiag query <domain> [type] [--protocol doh|dot] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--timeout 5s]")
+	fmt.Fprintln(writer, "usage: ednsdiag query <domain> [type] [--protocol doh|dot|doq|doh3] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--timeout 5s]")
 }

@@ -34,10 +34,10 @@ func TestCapabilities(t *testing.T) {
 	for _, item := range result.Capabilities {
 		available[item.Protocol] = item.Status == "available"
 	}
-	if !available["doh"] || !available["dot"] {
-		t.Fatalf("DoH and DoT must be available: %#v", available)
+	if !available["doh"] || !available["dot"] || !available["doq"] || !available["doh3"] {
+		t.Fatalf("DoH, DoT, DoQ, and DoH3 must be available: %#v", available)
 	}
-	if available["doq"] || available["doh3"] || available["dnscrypt"] {
+	if available["dnscrypt"] {
 		t.Fatalf("planned transports must not be available: %#v", available)
 	}
 }
@@ -65,6 +65,20 @@ func TestParseQueryArgsAllowsInterspersedOptions(t *testing.T) {
 	}
 	if timeout != 3*time.Second {
 		t.Fatalf("timeout = %v, want 3s", timeout)
+	}
+}
+
+func TestParseQueryArgsAllowsQUICProtocols(t *testing.T) {
+	for _, protocol := range []string{"doq", "doh3"} {
+		t.Run(protocol, func(t *testing.T) {
+			options, _, err := parseQueryArgs([]string{"example.com", "A", "--protocol", protocol})
+			if err != nil {
+				t.Fatalf("parse %s query: %v", protocol, err)
+			}
+			if options.Protocol != protocol {
+				t.Fatalf("protocol = %q, want %q", options.Protocol, protocol)
+			}
+		})
 	}
 }
 

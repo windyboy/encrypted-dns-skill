@@ -11,6 +11,9 @@ type Provider struct {
 	DoHURL  string
 	DoTAddr string
 	DoTName string
+	DoQAddr string
+	DoQName string
+	DoH3URL string
 }
 
 var providers = map[string]Provider{
@@ -20,6 +23,7 @@ var providers = map[string]Provider{
 		DoHURL:  "https://cloudflare-dns.com/dns-query",
 		DoTAddr: "one.one.one.one:853",
 		DoTName: "one.one.one.one",
+		DoH3URL: "https://cloudflare-dns.com/dns-query",
 	},
 	"google": {
 		ID:      "google",
@@ -27,6 +31,7 @@ var providers = map[string]Provider{
 		DoHURL:  "https://dns.google/dns-query",
 		DoTAddr: "dns.google:853",
 		DoTName: "dns.google",
+		DoH3URL: "https://dns.google/dns-query",
 	},
 	"quad9": {
 		ID:      "quad9",
@@ -41,7 +46,29 @@ var providers = map[string]Provider{
 		DoHURL:  "https://dns.adguard-dns.com/dns-query",
 		DoTAddr: "dns.adguard-dns.com:853",
 		DoTName: "dns.adguard-dns.com",
+		DoQAddr: "dns.adguard-dns.com:853",
+		DoQName: "dns.adguard-dns.com",
 	},
+}
+
+func (provider Provider) Endpoint(protocol string) (string, error) {
+	var endpoint string
+	switch strings.ToLower(protocol) {
+	case "doh":
+		endpoint = provider.DoHURL
+	case "dot":
+		endpoint = provider.DoTAddr
+	case "doq":
+		endpoint = provider.DoQAddr
+	case "doh3":
+		endpoint = provider.DoH3URL
+	default:
+		return "", fmt.Errorf("protocol %q is not available", protocol)
+	}
+	if endpoint == "" {
+		return "", fmt.Errorf("provider %q does not support protocol %q", provider.ID, protocol)
+	}
+	return endpoint, nil
 }
 
 func FindProvider(name string) (Provider, error) {

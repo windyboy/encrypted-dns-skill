@@ -37,7 +37,8 @@
         "bootstrap": { "type": "string" },
         "tls_version": { "type": "string" },
         "alpn": { "type": "string" },
-        "http_version": { "type": "string" }
+        "http_version": { "type": "string" },
+        "quic_version": { "type": "string" }
       },
       "additionalProperties": true
     },

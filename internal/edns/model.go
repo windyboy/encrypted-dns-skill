@@ -40,6 +40,7 @@ type TransportInfo struct {
 	TLSVersion          string `json:"tls_version,omitempty"`
 	ALPN                string `json:"alpn,omitempty"`
 	HTTPVersion         string `json:"http_version,omitempty"`
+	QUICVersion         string `json:"quic_version,omitempty"`
 }
 
 type DNSInfo struct {
