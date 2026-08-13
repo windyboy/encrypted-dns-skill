@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -98,6 +99,13 @@ func exchangeHTTPSDNSWithClient(ctx context.Context, client *http.Client, endpoi
 	defer response.Body.Close()
 
 	info.HTTPVersion = response.Proto
+	if age := response.Header.Get("Age"); age != "" {
+		parsedAge, err := strconv.ParseInt(age, 10, 64)
+		if err != nil || parsedAge < 0 {
+			return nil, info, fmt.Errorf("DoH server returned invalid Age header %q", age)
+		}
+		info.HTTPAgeSeconds = parsedAge
+	}
 	if response.TLS == nil || len(response.TLS.VerifiedChains) == 0 {
 		return nil, info, fmt.Errorf("DoH server TLS identity was not verified")
 	}
