@@ -40,6 +40,7 @@
         "tls_version": { "type": "string" },
         "alpn": { "type": "string" },
         "http_version": { "type": "string" },
+        "http_age_seconds": { "type": "integer", "minimum": 0 },
         "quic_version": { "type": "string" },
         "crypto_construction": { "type": "string" }
       },
