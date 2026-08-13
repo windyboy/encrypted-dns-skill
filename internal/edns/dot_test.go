@@ -205,13 +205,17 @@ func newTestCertificate(t *testing.T, name string) (tls.Certificate, *x509.CertP
 	}
 	template := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
-		DNSNames:              []string{name},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		IsCA:                  true,
 		BasicConstraintsValid: true,
+	}
+	if address := net.ParseIP(name); address != nil {
+		template.IPAddresses = []net.IP{address}
+	} else {
+		template.DNSNames = []string{name}
 	}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
 	if err != nil {
