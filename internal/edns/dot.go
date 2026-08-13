@@ -11,6 +11,14 @@ import (
 )
 
 func exchangeDoT(ctx context.Context, provider Provider, wire []byte) ([]byte, TransportInfo, error) {
+	return exchangeDoTWithTLSConfig(ctx, provider, wire, &tls.Config{
+		ServerName: provider.DoTName,
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"dot"},
+	})
+}
+
+func exchangeDoTWithTLSConfig(ctx context.Context, provider Provider, wire []byte, tlsConfig *tls.Config) ([]byte, TransportInfo, error) {
 	started := time.Now()
 	info := TransportInfo{
 		Protocol:  "dot",
@@ -30,11 +38,9 @@ func exchangeDoT(ctx context.Context, provider Provider, wire []byte) ([]byte, T
 		}
 	}
 
-	tlsConnection := tls.Client(rawConnection, &tls.Config{
-		ServerName: provider.DoTName,
-		MinVersion: tls.VersionTLS12,
-		NextProtos: []string{"dot"},
-	})
+	tlsConfig = tlsConfig.Clone()
+	tlsConfig.ServerName = provider.DoTName
+	tlsConnection := tls.Client(rawConnection, tlsConfig)
 	if err := tlsConnection.HandshakeContext(ctx); err != nil {
 		info.ElapsedMS = time.Since(started).Milliseconds()
 		return nil, info, fmt.Errorf("authenticate DoT server: %w", err)
