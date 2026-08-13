@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/windyboy/encrypted-dns-skill/schemas/result-v1.schema.json",
+  "title": "Encrypted DNS diagnostic result",
+  "type": "object",
+  "required": ["schema_version", "operation", "completed", "query", "transport", "dns"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "operation": { "enum": ["query", "probe", "compare"] },
+    "completed": { "type": "boolean" },
+    "query": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "resolver": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "profile": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "transport": {
+      "type": "object",
+      "required": ["protocol", "encrypted", "server_authenticated"],
+      "properties": {
+        "protocol": { "enum": ["doh", "dot", "doq", "doh3", "dnscrypt", "odoh", "anonymized-dnscrypt"] },
+        "encrypted": { "type": "boolean" },
+        "server_authenticated": { "type": "boolean" },
+        "elapsed_ms": { "type": "integer", "minimum": 0 },
+        "bootstrap": { "type": "string" },
+        "tls_version": { "type": "string" },
+        "alpn": { "type": "string" },
+        "http_version": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "dns": {
+      "type": "object",
+      "required": ["rcode", "rcode_value", "answers"],
+      "properties": {
+        "rcode": { "type": "string" },
+        "rcode_value": { "type": "integer", "minimum": 0 },
+        "resolver_reports_dnssec_authenticated": { "type": "boolean" },
+        "client_validated_dnssec": { "type": "boolean" },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "ttl"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string" },
+              "ttl": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "fallback_used": { "type": "boolean" },
+    "attempts": { "type": "array", "items": { "type": "object" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "error": {
+      "type": "object",
+      "required": ["class", "message"],
+      "properties": {
+        "class": { "enum": ["input", "transport", "protocol", "internal"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
