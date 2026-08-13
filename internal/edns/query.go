@@ -2,6 +2,7 @@ package edns
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -30,15 +31,27 @@ func Query(ctx context.Context, options QueryOptions) Result {
 		return result
 	}
 	result.Resolver = ResolverInfo{Provider: provider.ID, Profile: provider.Profile}
+	endpoint, err := provider.Endpoint(options.Protocol)
+	if err != nil {
+		result.Error = &ErrorInfo{Class: "input", Message: err.Error()}
+		return result
+	}
+	result.Resolver.Endpoint = endpoint
+	if options.Protocol == "doq" {
+		binary.BigEndian.PutUint16(wire[:2], 0)
+		transactionID = 0
+	}
 
 	var response []byte
 	switch options.Protocol {
 	case "doh":
-		result.Resolver.Endpoint = provider.DoHURL
 		response, result.Transport, err = exchangeDoH(ctx, provider, wire, options.Method)
 	case "dot":
-		result.Resolver.Endpoint = provider.DoTAddr
 		response, result.Transport, err = exchangeDoT(ctx, provider, wire)
+	case "doq":
+		response, result.Transport, err = exchangeDoQ(ctx, provider, wire)
+	case "doh3":
+		response, result.Transport, err = exchangeDoH3(ctx, provider, wire, options.Method)
 	default:
 		err = fmt.Errorf("protocol %q is not available; run ednsdiag capabilities", options.Protocol)
 	}
