@@ -76,3 +76,103 @@ func TestCompareValidatesAttemptLimits(t *testing.T) {
 		t.Fatalf("attempt limit was not enforced before execution: %#v", result)
 	}
 }
+
+func TestCompareStartsTargetsIndependentlyAndPreservesOrder(t *testing.T) {
+	targets := []CompareTarget{
+		{Protocol: "doh", Provider: "cloudflare", Method: "post"},
+		{Protocol: "dot", Provider: "google", Method: "post"},
+		{Protocol: "doh", Provider: "quad9", Method: "post"},
+	}
+	started := make(chan string, len(targets))
+	release := make(chan struct{})
+	resultChannel := make(chan CompareResult, 1)
+	go func() {
+		resultChannel <- compareWithQuery(t.Context(), CompareOptions{
+			Name: "example.com", RecordType: "A", AttemptTimeout: time.Second, MaxAttempts: 3, Targets: targets,
+		}, func(ctx context.Context, query QueryOptions) Result {
+			started <- query.Provider
+			select {
+			case <-release:
+				return completedCompareAttempt(query)
+			case <-ctx.Done():
+				return failedCompareResult(query, "transport", ctx.Err().Error())
+			}
+		})
+	}()
+
+	seen := map[string]bool{}
+	for range targets {
+		select {
+		case provider := <-started:
+			seen[provider] = true
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("comparison serialized targets instead of starting them independently")
+		}
+	}
+	close(release)
+	result := <-resultChannel
+	if len(seen) != len(targets) || !result.Completed {
+		t.Fatalf("unexpected concurrent result: seen=%v result=%#v", seen, result)
+	}
+	for index, target := range targets {
+		if result.Attempts[index].Resolver.Provider != target.Provider {
+			t.Fatalf("attempt %d provider = %q, want %q", index, result.Attempts[index].Resolver.Provider, target.Provider)
+		}
+	}
+}
+
+func TestCompareMixedFailurePrefersTransport(t *testing.T) {
+	result := compareWithQuery(t.Context(), CompareOptions{
+		Name: "example.com", RecordType: "A", AttemptTimeout: time.Second, MaxAttempts: 2,
+		Targets: []CompareTarget{
+			{Protocol: "doh", Provider: "cloudflare", Method: "post"},
+			{Protocol: "dot", Provider: "google", Method: "post"},
+		},
+	}, func(_ context.Context, query QueryOptions) Result {
+		if query.Provider == "cloudflare" {
+			return failedCompareResult(query, "unsupported", "unsupported fixture")
+		}
+		return failedCompareResult(query, "transport", "transport fixture")
+	})
+	if result.Error == nil || result.Error.Class != "transport" || result.Summary.Unsupported != 1 {
+		t.Fatalf("unexpected mixed failure result: %#v", result)
+	}
+}
+
+func TestCompareRejectsCanceledParentBeforeStartingTargets(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	calls := 0
+	result := compareWithQuery(ctx, CompareOptions{
+		Name: "example.com", RecordType: "A", AttemptTimeout: time.Second, MaxAttempts: 2,
+		Targets: []CompareTarget{
+			{Protocol: "doh", Provider: "cloudflare", Method: "post"},
+			{Protocol: "dot", Provider: "google", Method: "post"},
+		},
+	}, func(_ context.Context, query QueryOptions) Result {
+		calls++
+		return completedCompareAttempt(query)
+	})
+	if calls != 0 || len(result.Attempts) != 0 || result.Error == nil || result.Error.Class != "transport" {
+		t.Fatalf("unexpected canceled comparison: calls=%d result=%#v", calls, result)
+	}
+}
+
+func completedCompareAttempt(query QueryOptions) Result {
+	return Result{
+		SchemaVersion: 1, Operation: "query", Completed: true,
+		Query:     QueryInfo{Name: "example.com", Type: "A"},
+		Resolver:  ResolverInfo{Provider: query.Provider, Endpoint: "fixture.example:443", Profile: "test"},
+		Transport: testTransport(query.Protocol, 0),
+		DNS: DNSInfo{RCode: "NOERROR", Answers: []AnswerRecord{{
+			"name": "example.com", "type": "A", "ttl": uint32(60), "address": "192.0.2.1",
+		}}},
+	}
+}
+
+func failedCompareResult(query QueryOptions, class, message string) Result {
+	result := completedCompareAttempt(query)
+	result.Completed = false
+	result.Error = &ErrorInfo{Class: class, Message: message}
+	return result
+}
