@@ -92,6 +92,7 @@ func TestQueryProbeAndCompareGoldenContracts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read golden: %v", err)
 			}
+			want = bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n"))
 			if !bytes.Equal(stdout.Bytes(), want) {
 				t.Fatalf("stdout does not match %s\nwant:\n%s\ngot:\n%s", test.golden, want, stdout.Bytes())
 			}
