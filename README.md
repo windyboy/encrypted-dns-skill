@@ -37,7 +37,7 @@ addresses returned in DNS answers.
 
 ## Requirements
 
-- Go 1.26 or later when running or building from source
+- Go 1.26.5 or later when running or building from source
 - Network access to the selected encrypted DNS resolver
 - A host that supports the [Agent Skills package format](https://agentskills.io/specification) when using the repository as a Skill
 
@@ -110,8 +110,8 @@ Research protocols are accepted as inputs so automation receives a structured
 
 `compare` accepts 2–8 unique, allowlisted targets, bounded by `--max-attempts`.
 Its total timeout is `250ms`–`60s`; each attempt timeout is `250ms`–`30s` and
-cannot exceed the total. Comparison attempts run independently and answers are
-never merged.
+cannot exceed the total. Comparison targets start concurrently, results retain
+the requested target order, and answers are never merged.
 
 Supported record types are `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `SOA`,
 `CAA`, `SRV`, `PTR`, `HTTPS`, and `SVCB`. For `PTR`, pass an IP address; the CLI
@@ -146,6 +146,10 @@ Every query returns structured JSON compatible with
   was used to locate the encrypted resolver endpoint.
 - DNSCrypt reports `bootstrap: stamp_ip`, the authenticated provider name,
   resolver certificate serial, and selected crypto construction.
+- DoH and DoH3 subtract a valid HTTP `Age` value from returned answer TTLs and
+  report it as `transport.http_age_seconds`.
+- Truncated or non-representable DNS answers are protocol failures rather than
+  partial `completed: true` results.
 
 Human-readable usage errors go to stderr. Machine-readable operational results
 go to stdout. Stable exit codes are:
@@ -180,7 +184,10 @@ model and privacy boundaries.
 
 ```bash
 go test ./...
+go test -race ./...
 go vet ./...
+go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 ```
 
 Protocol behavior must remain aligned with
