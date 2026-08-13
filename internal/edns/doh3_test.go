@@ -39,10 +39,11 @@ func TestExchangeDoH3(t *testing.T) {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
-		response, err := (dnsmessage.Message{
+		responseMessage := dnsmessage.Message{
 			Header:    dnsmessage.Header{ID: query.Header.ID, Response: true, RCode: dnsmessage.RCodeServerFailure},
 			Questions: query.Questions,
-		}).Pack()
+		}
+		response, err := responseMessage.Pack()
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
@@ -118,7 +119,7 @@ func TestExchangeDoH3RejectsUnexpectedALPN(t *testing.T) {
 			TLS: &tls.ConnectionState{
 				Version:            tls.VersionTLS13,
 				NegotiatedProtocol: "unexpected",
-				VerifiedChains:      [][]*x509.Certificate{{new(x509.Certificate)}},
+				VerifiedChains:     [][]*x509.Certificate{{new(x509.Certificate)}},
 			},
 		}, nil
 	})}
