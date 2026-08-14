@@ -5,19 +5,23 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"net"
+	"net/url"
 	"time"
 )
 
-func exchangeDoT(ctx context.Context, provider Provider, wire []byte) ([]byte, TransportInfo, error) {
-	return exchangeDoTWithTLSConfig(ctx, provider, wire, &tls.Config{
+func exchangeDoT(ctx context.Context, provider Provider, wire []byte, explicitProxy string) ([]byte, TransportInfo, error) {
+	return exchangeDoTWithTLSConfigAndProxy(ctx, provider, wire, &tls.Config{
 		ServerName: provider.DoTName,
 		MinVersion: tls.VersionTLS12,
 		NextProtos: []string{"dot"},
-	})
+	}, explicitProxy)
 }
 
 func exchangeDoTWithTLSConfig(ctx context.Context, provider Provider, wire []byte, tlsConfig *tls.Config) ([]byte, TransportInfo, error) {
+	return exchangeDoTWithTLSConfigAndProxy(ctx, provider, wire, tlsConfig, "")
+}
+
+func exchangeDoTWithTLSConfigAndProxy(ctx context.Context, provider Provider, wire []byte, tlsConfig *tls.Config, explicitProxy string) ([]byte, TransportInfo, error) {
 	started := time.Now()
 	info := TransportInfo{
 		Protocol:  "dot",
@@ -25,7 +29,13 @@ func exchangeDoTWithTLSConfig(ctx context.Context, provider Provider, wire []byt
 		Bootstrap: "system_resolver",
 	}
 
-	rawConnection, err := (&net.Dialer{}).DialContext(ctx, "tcp", provider.DoTAddr)
+	endpoint := &url.URL{Scheme: "https", Host: provider.DoTAddr}
+	proxyURL, err := resolveProxy(endpoint, explicitProxy)
+	if err != nil {
+		return nil, info, fmt.Errorf("select DoT proxy: %w", err)
+	}
+	info.Proxy = proxyDisplayURL(proxyURL)
+	rawConnection, err := dialTCP(ctx, provider.DoTAddr, proxyURL)
 	if err != nil {
 		info.ElapsedMS = time.Since(started).Milliseconds()
 		return nil, info, fmt.Errorf("connect to DoT server: %w", err)

@@ -18,22 +18,39 @@ import (
 
 const maxDNSMessageSize = 65535
 
-func exchangeDoH(ctx context.Context, provider Provider, wire []byte, method string) ([]byte, TransportInfo, error) {
-	client := newDoHClient(provider.DoHURL)
-	return exchangeDoHWithClient(ctx, client, provider.DoHURL, wire, method)
+func exchangeDoH(ctx context.Context, provider Provider, wire []byte, method, explicitProxy string) ([]byte, TransportInfo, error) {
+	client, proxyLabel, err := newDoHClient(provider.DoHURL, explicitProxy)
+	if err != nil {
+		return nil, TransportInfo{Protocol: "doh", Encrypted: true, Bootstrap: "system_resolver"}, err
+	}
+	response, info, err := exchangeDoHWithClient(ctx, client, provider.DoHURL, wire, method)
+	info.Proxy = proxyLabel
+	return response, info, err
 }
 
-func newDoHClient(endpoint string) *http.Client {
-	origin, _ := url.Parse(endpoint)
+func newDoHClient(endpoint, explicitProxy string) (*http.Client, string, error) {
+	return newDoHClientWithTLSConfig(endpoint, explicitProxy, &tls.Config{MinVersion: tls.VersionTLS12})
+}
+
+func newDoHClientWithTLSConfig(endpoint, explicitProxy string, tlsConfig *tls.Config) (*http.Client, string, error) {
+	origin, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse DoH endpoint: %w", err)
+	}
+	proxyURL, err := resolveProxy(origin, explicitProxy)
+	if err != nil {
+		return nil, "", fmt.Errorf("select DoH proxy: %w", err)
+	}
 	transport := &http.Transport{
-		ForceAttemptHTTP2: true,
-		DialContext:       (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		},
+		ForceAttemptHTTP2:   true,
+		DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		TLSClientConfig:     tlsConfig.Clone(),
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
-	return &http.Client{
+	if proxyURL != nil {
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+	client := &http.Client{
 		Transport: transport,
 		CheckRedirect: func(request *http.Request, via []*http.Request) error {
 			if len(via) >= 3 {
@@ -48,6 +65,7 @@ func newDoHClient(endpoint string) *http.Client {
 			return nil
 		},
 	}
+	return client, proxyDisplayURL(proxyURL), nil
 }
 
 func exchangeDoHWithClient(ctx context.Context, client *http.Client, endpoint string, wire []byte, method string) ([]byte, TransportInfo, error) {

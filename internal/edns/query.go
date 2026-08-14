@@ -36,6 +36,14 @@ func queryWithExchange(ctx context.Context, options QueryOptions, exchange query
 		result.Error = &ErrorInfo{Class: "input", Message: err.Error()}
 		return result
 	}
+	if err := ValidateProxyURL(options.Proxy); err != nil {
+		result.Error = &ErrorInfo{Class: "input", Message: err.Error()}
+		return result
+	}
+	if options.Proxy != "" && options.Protocol != "doh" && options.Protocol != "dot" {
+		result.Error = &ErrorInfo{Class: "unsupported", Message: fmt.Sprintf("proxying is not available for protocol %q", options.Protocol)}
+		return result
+	}
 	result.Resolver = ResolverInfo{Provider: provider.ID, Profile: provider.Profile}
 	endpoint, err := provider.Endpoint(options.Protocol)
 	if err != nil {
@@ -81,9 +89,9 @@ func exchangeProtocol(ctx context.Context, provider Provider, wire []byte, optio
 	var err error
 	switch options.Protocol {
 	case "doh":
-		response, transport, err = exchangeDoH(ctx, provider, wire, options.Method)
+		response, transport, err = exchangeDoH(ctx, provider, wire, options.Method, options.Proxy)
 	case "dot":
-		response, transport, err = exchangeDoT(ctx, provider, wire)
+		response, transport, err = exchangeDoT(ctx, provider, wire, options.Proxy)
 	case "doq":
 		response, transport, err = exchangeDoQ(ctx, provider, wire)
 	case "doh3":

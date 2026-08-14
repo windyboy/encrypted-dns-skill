@@ -18,6 +18,7 @@ func TestRealQueryAndCompareResultsValidateAgainstResultV1(t *testing.T) {
 	if !query.Completed {
 		t.Fatalf("query fixture did not complete: %#v", query)
 	}
+	query.Transport.Proxy = "http://proxy.example:8080"
 	validateResultV1(t, query)
 
 	comparison := compareWithQuery(t.Context(), CompareOptions{

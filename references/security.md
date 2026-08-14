@@ -19,6 +19,27 @@ validation, fallback, or result claims.
 7. Do not enable AXFR, IXFR, or ANY queries.
 8. Do not persist full query names or client identifiers by default.
 
+## Proxy policy
+
+DoH and DoT may use an explicit `--proxy` or the standard Go
+[`ProxyFromEnvironment`](https://pkg.go.dev/net/http#ProxyFromEnvironment)
+selection rules for `HTTPS_PROXY` and `NO_PROXY`. An explicit URL takes
+precedence and must use `http` or `https`. DoT establishes an HTTP CONNECT
+tunnel and then performs the normal resolver TLS handshake inside it; the
+proxy never substitutes for resolver certificate, authentication-domain, SNI,
+or ALPN validation.
+
+Proxy credentials may be sent as HTTP Basic authentication when embedded in
+the URL, but must never appear in result JSON or diagnostic errors. Result
+metadata contains only a sanitized proxy endpoint. An HTTP(S) proxy can observe
+the resolver destination, connection timing, and traffic volume even though it
+cannot read the resolver TLS payload.
+
+DoH3, DoQ, and the current DNSCrypt transport use UDP or QUIC and do not use a
+TCP HTTP CONNECT proxy. Reject an explicit proxy for those protocols instead of
+silently connecting directly. Proxy failures are transport failures and never
+trigger plaintext DNS or an undisclosed direct connection.
+
 ## DoT ALPN policy
 
 The client advertises the IANA-registered `dot` ALPN identifier. An explicit

@@ -31,6 +31,11 @@ It never merges, ranks, or treats differing answers as interchangeable.
   `250ms`–`60s`; per-attempt timeouts are `250ms`–`30s` and no greater than the
   total timeout.
 - Compare defaults to at most four attempts and never permits more than eight.
+- DoH and DoT accept one shared `--proxy` value in absolute `http://` or
+  `https://` URL form. It overrides environment selection. Without the flag,
+  those transports use Go's standard `HTTPS_PROXY` and `NO_PROXY` rules.
+- Explicit proxy use with DoH3, DoQ, DNSCrypt, ODoH, or Anonymized DNSCrypt is
+  rejected; a TCP HTTP CONNECT proxy cannot carry their current UDP/QUIC paths.
 
 ## stdout, stderr, and exit status
 
@@ -65,6 +70,8 @@ Every operation uses `schema_version: 1` and validates against
 - `transport.server_authenticated` is independent from DNSSEC.
 - `transport.http_age_seconds`, when present, records the HTTP cache age
   subtracted from DoH and DoH3 answer TTLs.
+- `transport.proxy`, when present, records the selected HTTP(S) proxy URL with
+  userinfo removed. Its absence means no applicable proxy was selected.
 - `compare.attempts` contains complete `query` results. `summary` only counts
   them; it does not replace or combine them.
 - Record answers have type-specific stable fields. TXT character-strings are
