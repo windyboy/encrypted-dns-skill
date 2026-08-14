@@ -97,7 +97,11 @@ func exchangeProtocol(ctx context.Context, provider Provider, wire []byte, optio
 	case "doh3":
 		response, transport, err = exchangeDoH3(ctx, provider, wire, options.Method)
 	case "dnscrypt":
-		response, transport, peer, err = exchangeDNSCrypt(ctx, provider.DNSCryptStamp, wire)
+		var stamp string
+		stamp, err = provider.Endpoint("dnscrypt")
+		if err == nil {
+			response, transport, peer, err = exchangeDNSCrypt(ctx, stamp, wire)
+		}
 	default:
 		err = fmt.Errorf("protocol %q is not available; run ednsdiag capabilities", options.Protocol)
 	}
