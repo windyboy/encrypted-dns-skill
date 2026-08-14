@@ -162,6 +162,8 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 				return options, 0, fmt.Errorf("invalid timeout %q: %w", value, err)
 			}
 			timeout = parsed
+		case "proxy":
+			options.Proxy = value
 		default:
 			return options, 0, fmt.Errorf("unknown query option --%s", key)
 		}
@@ -190,6 +192,12 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 	}
 	if options.Protocol != "doh" && options.Protocol != "doh3" && options.Method != "post" {
 		return options, 0, fmt.Errorf("--method applies only to DoH and DoH3")
+	}
+	if err := edns.ValidateProxyURL(options.Proxy); err != nil {
+		return options, 0, err
+	}
+	if options.Proxy != "" && options.Protocol != "doh" && options.Protocol != "dot" {
+		return options, 0, fmt.Errorf("--proxy applies only to DoH and DoT")
 	}
 	return options, timeout, nil
 }
@@ -244,6 +252,8 @@ func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error)
 				return options, 0, fmt.Errorf("invalid max attempts %q", value)
 			}
 			options.MaxAttempts = parsed
+		case "proxy":
+			options.Proxy = value
 		default:
 			return options, 0, fmt.Errorf("unknown compare option --%s", key)
 		}
@@ -276,6 +286,16 @@ func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error)
 	}
 	if options.AttemptTimeout > totalTimeout {
 		return options, 0, fmt.Errorf("attempt timeout cannot exceed compare timeout")
+	}
+	if err := edns.ValidateProxyURL(options.Proxy); err != nil {
+		return options, 0, err
+	}
+	if options.Proxy != "" {
+		for _, target := range options.Targets {
+			if target.Protocol != "doh" && target.Protocol != "dot" {
+				return options, 0, fmt.Errorf("--proxy cannot be used with %s comparison targets", target.Protocol)
+			}
+		}
 	}
 	return options, totalTimeout, nil
 }
@@ -358,9 +378,9 @@ func writeUsage(writer io.Writer) {
 }
 
 func writeQueryUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: ednsdiag <query|probe> <domain> [type] [--protocol doh|dot|doq|doh3|dnscrypt|odoh|anonymized-dnscrypt] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--timeout 5s]")
+	fmt.Fprintln(writer, "usage: ednsdiag <query|probe> <domain> [type] [--protocol doh|dot|doq|doh3|dnscrypt|odoh|anonymized-dnscrypt] [--provider cloudflare|google|quad9|adguard] [--method post|get] [--proxy http://host:port] [--timeout 5s]")
 }
 
 func writeCompareUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: ednsdiag compare <domain> [type] --target protocol:provider[:method] --target protocol:provider[:method] [--attempt-timeout 5s] [--timeout 30s] [--max-attempts 4]")
+	fmt.Fprintln(writer, "usage: ednsdiag compare <domain> [type] --target protocol:provider[:method] --target protocol:provider[:method] [--proxy http://host:port] [--attempt-timeout 5s] [--timeout 30s] [--max-attempts 4]")
 }

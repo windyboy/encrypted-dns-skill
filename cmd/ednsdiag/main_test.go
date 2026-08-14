@@ -151,6 +151,41 @@ func TestParseQueryArgsAllowsSupportedAndResearchProtocols(t *testing.T) {
 	}
 }
 
+func TestParseQueryArgsAcceptsProxyForDoHAndDoTOnly(t *testing.T) {
+	for _, protocol := range []string{"doh", "dot"} {
+		options, _, err := parseQueryArgs([]string{"example.com", "--protocol", protocol, "--proxy", "http://proxy.example:8080"})
+		if err != nil {
+			t.Fatalf("parse %s proxy: %v", protocol, err)
+		}
+		if options.Proxy != "http://proxy.example:8080" {
+			t.Fatalf("proxy = %q", options.Proxy)
+		}
+	}
+	if _, _, err := parseQueryArgs([]string{"example.com", "--protocol", "doq", "--provider", "adguard", "--proxy", "http://proxy.example:8080"}); err == nil {
+		t.Fatal("DoQ accepted an HTTP proxy")
+	}
+	if _, _, err := parseQueryArgs([]string{"example.com", "--proxy", "socks5://proxy.example:1080"}); err == nil {
+		t.Fatal("unsupported proxy scheme was accepted")
+	}
+}
+
+func TestParseCompareArgsAcceptsSharedProxyForTCPAndHTTPTargets(t *testing.T) {
+	options, _, err := parseCompareArgs([]string{
+		"example.com", "--target", "doh:cloudflare", "--target", "dot:google", "--proxy", "https://proxy.example:8443",
+	})
+	if err != nil {
+		t.Fatalf("parse compare proxy: %v", err)
+	}
+	if options.Proxy != "https://proxy.example:8443" {
+		t.Fatalf("proxy = %q", options.Proxy)
+	}
+	if _, _, err := parseCompareArgs([]string{
+		"example.com", "--target", "doh:cloudflare", "--target", "doq:adguard", "--proxy", "http://proxy.example:8080",
+	}); err == nil {
+		t.Fatal("compare accepted a proxy with a QUIC target")
+	}
+}
+
 func TestParseCompareArgsRejectsDuplicatesAndLimits(t *testing.T) {
 	for _, args := range [][]string{
 		{"example.com", "--target", "doh:cloudflare", "--target", "doh:cloudflare"},

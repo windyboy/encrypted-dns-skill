@@ -37,7 +37,7 @@ addresses returned in DNS answers.
 
 ## Requirements
 
-- Go 1.26.5 or later when running or building from source
+- Go 1.26.6 or later when running or building from source
 - Network access to the selected encrypted DNS resolver
 - A host that supports the [Agent Skills package format](https://agentskills.io/specification) when using the repository as a Skill
 
@@ -66,6 +66,8 @@ the repository root:
 go run ./cmd/ednsdiag capabilities
 go run ./cmd/ednsdiag query example.com A --protocol doh --provider cloudflare
 go run ./cmd/ednsdiag query gmail.com MX --protocol dot --provider google --timeout 5s
+HTTPS_PROXY=http://127.0.0.1:8080 go run ./cmd/ednsdiag query example.com A --protocol doh
+go run ./cmd/ednsdiag query example.com A --protocol dot --proxy http://127.0.0.1:8080
 go run ./cmd/ednsdiag query example.com AAAA --protocol doq --provider adguard
 go run ./cmd/ednsdiag query example.com HTTPS --protocol doh3 --provider cloudflare
 go run ./cmd/ednsdiag query example.com A --protocol dnscrypt --provider adguard
@@ -95,11 +97,13 @@ ednsdiag query <domain> [type] \
   [--protocol doh|dot|doq|doh3|dnscrypt|odoh|anonymized-dnscrypt] \
   [--provider cloudflare|google|quad9|adguard] \
   [--method post|get] \
+  [--proxy http://host:port] \
   [--timeout 5s]
 ednsdiag probe <domain> [type] [query options]
 ednsdiag compare <domain> [type] \
   --target protocol:provider[:method] \
   --target protocol:provider[:method] \
+  [--proxy http://host:port] \
   [--attempt-timeout 5s] [--timeout 30s] [--max-attempts 4]
 ```
 
@@ -107,6 +111,16 @@ Defaults are `A`, `doh`, `cloudflare`, `post`, and `5s`. `--method` applies
 only to DoH and DoH3. The timeout must be between `250ms` and `30s`.
 Research protocols are accepted as inputs so automation receives a structured
 `unsupported` result and exit code `4`; they are never silently substituted.
+
+DoH and DoT honor Go's standard `HTTPS_PROXY`/`https_proxy` and
+`NO_PROXY`/`no_proxy` environment variables. `--proxy` overrides environment
+selection and accepts an `http://` or `https://` proxy URL, including optional
+Basic-auth userinfo. DoT uses HTTP CONNECT before its resolver TLS handshake.
+DoH3, DoQ, and DNSCrypt are UDP/QUIC transports and cannot use this TCP CONNECT
+proxy; an explicit proxy combined with one of those protocols is rejected.
+The same `--proxy` is shared by every DoH/DoT target in a `compare` operation.
+See Go's official [`ProxyFromEnvironment` documentation](https://pkg.go.dev/net/http#ProxyFromEnvironment)
+for environment-variable and `NO_PROXY` matching rules.
 
 `compare` accepts 2–8 unique, allowlisted targets, bounded by `--max-attempts`.
 Its total timeout is `250ms`–`60s`; each attempt timeout is `250ms`–`30s` and
@@ -144,6 +158,8 @@ Every query returns structured JSON compatible with
   it is not local DNSSEC validation.
 - `transport.bootstrap: system_resolver` means the operating system resolver
   was used to locate the encrypted resolver endpoint.
+- `transport.proxy`, when present, is the HTTP(S) proxy endpoint actually
+  selected for DoH or DoT. Embedded credentials are never reported.
 - DNSCrypt reports `bootstrap: stamp_ip`, the authenticated provider name,
   resolver certificate serial, and selected crypto construction.
 - DoH and DoH3 subtract a valid HTTP `Age` value from returned answer TTLs and

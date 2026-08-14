@@ -41,6 +41,25 @@ func TestCompareKeepsTargetResultsSeparate(t *testing.T) {
 	}
 }
 
+func TestComparePassesProxyToEveryTarget(t *testing.T) {
+	const proxyURL = "http://proxy.example:8080"
+	result := compareWithQuery(t.Context(), CompareOptions{
+		Name: "example.com", RecordType: "A", AttemptTimeout: time.Second, MaxAttempts: 2, Proxy: proxyURL,
+		Targets: []CompareTarget{
+			{Protocol: "doh", Provider: "cloudflare", Method: "post"},
+			{Protocol: "dot", Provider: "google", Method: "post"},
+		},
+	}, func(_ context.Context, query QueryOptions) Result {
+		if query.Proxy != proxyURL {
+			return failedCompareResult(query, "internal", "proxy was not propagated")
+		}
+		return completedCompareAttempt(query)
+	})
+	if !result.Completed {
+		t.Fatalf("unexpected comparison result: %#v", result)
+	}
+}
+
 func TestCompareReportsUnsupportedAttempts(t *testing.T) {
 	result := Compare(t.Context(), CompareOptions{
 		Name:           "example.com",

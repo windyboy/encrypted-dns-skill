@@ -9,7 +9,7 @@ Use `ednsdiag` for encrypted DNS work. Do not assemble protocol requests with
 `curl`, `openssl`, or ad-hoc scripts when `ednsdiag` supports the operation.
 The executable requires network access.
 
-Prefer an installed `ednsdiag` executable. When it is unavailable and Go 1.26.5+
+Prefer an installed `ednsdiag` executable. When it is unavailable and Go 1.26.6+
 is installed, run the source from the skill root with:
 
 ```bash
@@ -52,6 +52,11 @@ one diagnostic query while labeling the operation for automation. `compare`
 requires two or more explicit `protocol:provider[:method]` targets and preserves
 each result independently.
 
+For a user-requested HTTP(S) proxy, pass `--proxy http://host:port`. Without
+that flag, DoH and DoT honor `HTTPS_PROXY` and `NO_PROXY`. Only DoH and DoT can
+use this CONNECT proxy; do not add `--proxy` to DoH3, DoQ, or DNSCrypt commands.
+Never expose proxy credentials when quoting a command or interpreting output.
+
 ## Required behavior
 
 - Use standard DNS wire messages for DoH, not provider-specific JSON APIs.
@@ -73,6 +78,8 @@ each result independently.
 - Read `transport.server_authenticated` separately from DNSSEC fields.
 - Read `transport.bootstrap`; `system_resolver` means resolving the encrypted
   resolver endpoint itself used the operating system resolver.
+- If `transport.proxy` is present, the exchange used that sanitized proxy
+  endpoint; credentials are deliberately omitted.
 - For DNSCrypt, `stamp_ip` means the authenticated resolver stamp supplied the
   connection address; verify `resolver.authentication_name` and certificate
   metadata in the result.

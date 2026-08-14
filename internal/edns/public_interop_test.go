@@ -23,7 +23,7 @@ func TestPublicCloudflareDoHInteroperability(t *testing.T) {
 	wire[0], wire[1] = 0, 0
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	response, info, err := exchangeDoH(ctx, provider, wire, "post")
+	response, info, err := exchangeDoH(ctx, provider, wire, "post", "")
 	if err != nil {
 		skipIfPublicNetworkUnavailable(t, err)
 		t.Fatalf("exchange with public Cloudflare DoH resolver: %v", err)
@@ -48,7 +48,7 @@ func TestPublicCloudflareDoTInteroperability(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	response, info, err := exchangeDoT(ctx, provider, wire)
+	response, info, err := exchangeDoT(ctx, provider, wire, "")
 	if err != nil {
 		skipIfPublicNetworkUnavailable(t, err)
 		t.Fatalf("exchange with public Cloudflare DoT resolver: %v", err)

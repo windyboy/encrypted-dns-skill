@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"golang.org/x/net/dns/dnsmessage"
@@ -61,6 +62,58 @@ func TestExchangeDoHGETAndPOST(t *testing.T) {
 				t.Fatalf("unexpected result: response=%d info=%#v", len(response), info)
 			}
 		})
+	}
+}
+
+func TestExchangeDoHThroughHTTPConnectProxy(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		payload, err := io.ReadAll(request.Body)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var query dnsmessage.Message
+		if err := query.Unpack(payload); err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		response := dnsmessage.Message{
+			Header:    dnsmessage.Header{ID: query.Header.ID, Response: true},
+			Questions: query.Questions,
+		}
+		responseWire, err := response.Pack()
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/dns-message")
+		_, _ = writer.Write(responseWire)
+	}))
+	defer server.Close()
+
+	endpoint, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse test endpoint: %v", err)
+	}
+	proxyURL, proxyError := startConnectProxy(t, endpoint.Host, "Basic dXNlcjpzZWNyZXQ=")
+	testTransport := server.Client().Transport.(*http.Transport)
+	client, proxyLabel, err := newDoHClientWithTLSConfig(server.URL, proxyURL, testTransport.TLSClientConfig)
+	if err != nil {
+		t.Fatalf("create proxied DoH client: %v", err)
+	}
+	if proxyLabel == "" || proxyLabel == proxyURL {
+		t.Fatalf("proxy label = %q, want sanitized URL", proxyLabel)
+	}
+	wire, _, _, err := BuildQuery("example.com", "A")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	if _, _, err := exchangeDoHWithClient(t.Context(), client, server.URL, wire, "post"); err != nil {
+		t.Fatalf("exchange DoH through proxy: %v", err)
+	}
+	client.CloseIdleConnections()
+	if err := <-proxyError; err != nil {
+		t.Fatalf("serve CONNECT proxy: %v", err)
 	}
 }
 

@@ -104,6 +104,59 @@ func TestExchangeDoTAuthenticatesServer(t *testing.T) {
 	}
 }
 
+func TestExchangeDoTThroughHTTPConnectProxy(t *testing.T) {
+	certificate, roots := newTestCertificate(t, "resolver.test")
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+		NextProtos:   []string{"dot"},
+	})
+	if err != nil {
+		t.Fatalf("listen for DoT: %v", err)
+	}
+	defer listener.Close()
+
+	serverError := make(chan error, 1)
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			serverError <- err
+			return
+		}
+		defer connection.Close()
+		response, err := serveOneDoTQuery(connection)
+		if err == nil {
+			err = writeAll(connection, response)
+		}
+		serverError <- err
+	}()
+
+	proxyURL, proxyError := startConnectProxy(t, listener.Addr().String(), "Basic dXNlcjpzZWNyZXQ=")
+	queryWire, _, _, err := BuildQuery("example.com", "A")
+	if err != nil {
+		t.Fatalf("build query: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, info, err := exchangeDoTWithTLSConfigAndProxy(ctx, Provider{DoTAddr: listener.Addr().String(), DoTName: "resolver.test"}, queryWire, &tls.Config{
+		RootCAs:    roots,
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"dot"},
+	}, proxyURL)
+	if err != nil {
+		t.Fatalf("exchange DoT through proxy: %v", err)
+	}
+	if info.Proxy == "" || strings.Contains(info.Proxy, "secret") || strings.Contains(info.Proxy, "user") {
+		t.Fatalf("proxy metadata was missing or exposed credentials: %#v", info)
+	}
+	if err := <-serverError; err != nil {
+		t.Fatalf("serve DoT: %v", err)
+	}
+	if err := <-proxyError; err != nil {
+		t.Fatalf("serve CONNECT proxy: %v", err)
+	}
+}
+
 func TestExchangeDoTAllowsMissingALPN(t *testing.T) {
 	certificate, roots := newTestCertificate(t, "resolver.test")
 	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{

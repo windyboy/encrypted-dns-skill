@@ -61,6 +61,7 @@ func compareWithQuery(ctx context.Context, options CompareOptions, queryFunc fun
 				Protocol:   target.Protocol,
 				Provider:   target.Provider,
 				Method:     target.Method,
+				Proxy:      options.Proxy,
 			})
 		}()
 	}

@@ -50,6 +50,19 @@ func TestQueryReturnsProtocolErrorForTruncatedResponse(t *testing.T) {
 	}
 }
 
+func TestQueryRejectsExplicitProxyForUDPProtocol(t *testing.T) {
+	called := false
+	result := queryWithExchange(t.Context(), QueryOptions{
+		Name: "example.com", RecordType: "A", Protocol: "doq", Provider: "adguard", Method: "post", Proxy: "http://proxy.example:8080",
+	}, func(context.Context, Provider, []byte, QueryOptions) ([]byte, TransportInfo, dnsCryptPeerInfo, error) {
+		called = true
+		return nil, TransportInfo{}, dnsCryptPeerInfo{}, nil
+	})
+	if called || result.Completed || result.Error == nil || result.Error.Class != "unsupported" {
+		t.Fatalf("unexpected proxy result: called=%v result=%#v", called, result)
+	}
+}
+
 func TestQueryTreatsREFUSEDAndNODATAAsCompletedDNSOutcomes(t *testing.T) {
 	tests := []struct {
 		name  string

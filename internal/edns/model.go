@@ -8,6 +8,7 @@ type QueryOptions struct {
 	Protocol   string
 	Provider   string
 	Method     string
+	Proxy      string
 }
 
 type CompareTarget struct {
@@ -22,6 +23,7 @@ type CompareOptions struct {
 	Targets        []CompareTarget
 	AttemptTimeout time.Duration
 	MaxAttempts    int
+	Proxy          string
 }
 
 type Result struct {
@@ -78,6 +80,7 @@ type TransportInfo struct {
 	HTTPAgeSeconds      int64  `json:"http_age_seconds,omitempty"`
 	QUICVersion         string `json:"quic_version,omitempty"`
 	CryptoConstruction  string `json:"crypto_construction,omitempty"`
+	Proxy               string `json:"proxy,omitempty"`
 }
 
 type DNSInfo struct {
