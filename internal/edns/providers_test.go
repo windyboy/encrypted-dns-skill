@@ -1,9 +1,12 @@
 package edns
 
 import (
+	"bytes"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/ameshkov/dnsstamps"
 )
 
 func TestBuiltInProvidersHaveStrictEndpoints(t *testing.T) {
@@ -25,6 +28,50 @@ func TestBuiltInProvidersHaveStrictEndpoints(t *testing.T) {
 	}
 	if _, err := FindProvider("custom"); err == nil {
 		t.Fatal("unapproved custom provider was accepted")
+	}
+}
+
+func TestAdGuardDNSCryptMetadataGeneratesValidStamp(t *testing.T) {
+	provider, err := FindProvider("adguard")
+	if err != nil {
+		t.Fatalf("find AdGuard provider: %v", err)
+	}
+	if provider.DNSCrypt == (DNSCryptConfig{}) {
+		t.Fatal("AdGuard DNSCrypt metadata is missing")
+	}
+	encoded, err := provider.Endpoint("dnscrypt")
+	if err != nil {
+		t.Fatalf("generate DNSCrypt stamp: %v", err)
+	}
+	stamp, err := dnsstamps.NewServerStampFromString(encoded)
+	if err != nil {
+		t.Fatalf("parse generated DNSCrypt stamp: %v", err)
+	}
+	if stamp.Proto != dnsstamps.StampProtoTypeDNSCrypt ||
+		stamp.ServerAddrStr != provider.DNSCrypt.ServerAddress ||
+		stamp.ProviderName != provider.DNSCrypt.ProviderName ||
+		stamp.Props != provider.DNSCrypt.Properties ||
+		!bytes.Equal(stamp.ServerPk, provider.DNSCrypt.PublicKey[:]) {
+		t.Fatalf("generated stamp does not preserve public metadata: %#v", stamp)
+	}
+}
+
+func TestDNSCryptMetadataRejectsIncompleteConfiguration(t *testing.T) {
+	validKey := [32]byte{1}
+	tests := []struct {
+		name   string
+		config DNSCryptConfig
+	}{
+		{name: "missing address", config: DNSCryptConfig{ProviderName: "2.example", PublicKey: validKey}},
+		{name: "missing provider name", config: DNSCryptConfig{ServerAddress: "192.0.2.1:443", PublicKey: validKey}},
+		{name: "missing public key", config: DNSCryptConfig{ServerAddress: "192.0.2.1:443", ProviderName: "2.example"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := test.config.Stamp(); err == nil {
+				t.Fatal("incomplete DNSCrypt metadata was accepted")
+			}
+		})
 	}
 }
 

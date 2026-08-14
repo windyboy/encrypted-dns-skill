@@ -213,7 +213,11 @@ func TestDNSCryptAdGuardInteroperability(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	response, info, peer, err := exchangeDNSCrypt(ctx, provider.DNSCryptStamp, wire)
+	stamp, err := provider.Endpoint("dnscrypt")
+	if err != nil {
+		t.Fatalf("build public AdGuard DNSCrypt stamp: %v", err)
+	}
+	response, info, peer, err := exchangeDNSCrypt(ctx, stamp, wire)
 	if err != nil {
 		t.Fatalf("exchange with public AdGuard DNSCrypt resolver: %v", err)
 	}
