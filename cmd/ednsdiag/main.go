@@ -29,18 +29,11 @@ var (
 	runCompare = edns.Compare
 )
 
-type capability struct {
-	Protocol string `json:"protocol"`
-	Status   string `json:"status"`
-	Standard string `json:"standard,omitempty"`
-	Note     string `json:"note,omitempty"`
-}
-
 type capabilitiesResult struct {
-	SchemaVersion int          `json:"schema_version"`
-	Command       string       `json:"command"`
-	Version       string       `json:"version"`
-	Capabilities  []capability `json:"capabilities"`
+	SchemaVersion int               `json:"schema_version"`
+	Command       string            `json:"command"`
+	Version       string            `json:"version"`
+	Capabilities  []edns.Capability `json:"capabilities"`
 }
 
 func main() {
@@ -63,15 +56,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			SchemaVersion: 1,
 			Command:       "capabilities",
 			Version:       version,
-			Capabilities: []capability{
-				{Protocol: "doh", Status: "available", Standard: "RFC 8484", Note: "RFC wire format over HTTP GET or POST"},
-				{Protocol: "dot", Status: "available", Standard: "RFC 7858 and RFC 8310", Note: "strict PKIX and authentication-domain validation"},
-				{Protocol: "doq", Status: "available", Standard: "RFC 9250", Note: "RFC wire format over dedicated QUIC streams"},
-				{Protocol: "doh3", Status: "available", Standard: "RFC 8484 over HTTP/3", Note: "RFC wire format over HTTP/3 GET or POST"},
-				{Protocol: "dnscrypt", Status: "available", Standard: "DNSCrypt protocol specification", Note: "DNSCrypt v2 with authenticated resolver certificates"},
-				{Protocol: "odoh", Status: "research", Standard: "RFC 9230", Note: "No maintained Go dependency has been selected."},
-				{Protocol: "anonymized-dnscrypt", Status: "research", Standard: "Anonymized DNSCrypt specification"},
-			},
+			Capabilities:  edns.Capabilities(),
 		}
 		return writeJSON(stdout, stderr, result)
 
@@ -167,25 +152,25 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 	if timeout < 250*time.Millisecond || timeout > 30*time.Second {
 		return options, 0, fmt.Errorf("timeout must be between 250ms and 30s")
 	}
-	if !knownRecordType(options.RecordType) {
+	if !edns.IsSupportedRecordType(options.RecordType) {
 		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
 	}
-	if !knownProtocol(options.Protocol) {
+	if !edns.KnownProtocol(options.Protocol) {
 		return options, 0, fmt.Errorf("unknown protocol %q", options.Protocol)
 	}
 	if _, err := edns.FindProvider(options.Provider); err != nil {
 		return options, 0, err
 	}
-	if options.Method != "get" && options.Method != "post" {
-		return options, 0, fmt.Errorf("DoH method must be get or post")
-	}
-	if options.Protocol != "doh" && options.Protocol != "doh3" && options.Method != "post" {
+	if err := edns.ValidateHTTPMethod(options.Protocol, options.Method); err != nil {
+		if options.Method != "get" && options.Method != "post" {
+			return options, 0, fmt.Errorf("DoH method must be get or post")
+		}
 		return options, 0, fmt.Errorf("--method applies only to DoH and DoH3")
 	}
 	if err := edns.ValidateProxyURL(options.Proxy); err != nil {
 		return options, 0, err
 	}
-	if options.Proxy != "" && options.Protocol != "doh" && options.Protocol != "dot" {
+	if options.Proxy != "" && !edns.ProxySupportedForProtocol(options.Protocol) {
 		return options, 0, fmt.Errorf("--proxy applies only to DoH and DoT")
 	}
 	return options, timeout, nil
@@ -244,7 +229,7 @@ func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error)
 	}
 	options.Name = name
 	options.RecordType = recordType
-	if !knownRecordType(options.RecordType) {
+	if !edns.IsSupportedRecordType(options.RecordType) {
 		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
 	}
 	if len(options.Targets) < 2 {
@@ -270,7 +255,7 @@ func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error)
 	}
 	if options.Proxy != "" {
 		for _, target := range options.Targets {
-			if target.Protocol != "doh" && target.Protocol != "dot" {
+			if !edns.ProxySupportedForProtocol(target.Protocol) {
 				return options, 0, fmt.Errorf("--proxy cannot be used with %s comparison targets", target.Protocol)
 			}
 		}
@@ -324,37 +309,19 @@ func parseCompareTarget(value string) (edns.CompareTarget, error) {
 	if len(parts) == 3 {
 		target.Method = strings.ToLower(parts[2])
 	}
-	if !knownProtocol(target.Protocol) {
+	if !edns.KnownProtocol(target.Protocol) {
 		return target, fmt.Errorf("unknown protocol %q", target.Protocol)
 	}
 	if _, err := edns.FindProvider(target.Provider); err != nil {
 		return target, err
 	}
-	if target.Method != "get" && target.Method != "post" {
-		return target, fmt.Errorf("target method must be get or post")
-	}
-	if target.Protocol != "doh" && target.Protocol != "doh3" && target.Method != "post" {
+	if err := edns.ValidateHTTPMethod(target.Protocol, target.Method); err != nil {
+		if target.Method != "get" && target.Method != "post" {
+			return target, fmt.Errorf("target method must be get or post")
+		}
 		return target, fmt.Errorf("GET method applies only to DoH and DoH3 targets")
 	}
 	return target, nil
-}
-
-func knownProtocol(protocol string) bool {
-	switch protocol {
-	case "doh", "dot", "doq", "doh3", "dnscrypt", "odoh", "anonymized-dnscrypt":
-		return true
-	default:
-		return false
-	}
-}
-
-func knownRecordType(recordType string) bool {
-	switch recordType {
-	case "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA", "SRV", "PTR", "HTTPS", "SVCB":
-		return true
-	default:
-		return false
-	}
 }
 
 func resultExitCode(completed bool, resultError *edns.ErrorInfo) int {

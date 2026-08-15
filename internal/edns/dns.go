@@ -13,6 +13,11 @@ import (
 	"golang.org/x/net/idna"
 )
 
+func IsSupportedRecordType(recordType string) bool {
+	_, ok := recordTypes[strings.ToUpper(recordType)]
+	return ok
+}
+
 var recordTypes = map[string]dnsmessage.Type{
 	"A":     dnsmessage.TypeA,
 	"AAAA":  dnsmessage.TypeAAAA,
