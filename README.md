@@ -11,17 +11,8 @@ URLs, TLS sessions, or DNS wire messages themselves.
 
 ## Status
 
-| Protocol | Status | Standard |
-| --- | --- | --- |
-| DNS over HTTPS (DoH) | Available (GET and POST) | [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) |
-| DNS over TLS (DoT) | Available (strict authentication) | [RFC 7858](https://www.rfc-editor.org/rfc/rfc7858.html), [RFC 8310](https://www.rfc-editor.org/rfc/rfc8310.html) |
-| DNS over QUIC (DoQ) | Available | [RFC 9250](https://www.rfc-editor.org/rfc/rfc9250.html) |
-| DoH over HTTP/3 (DoH3) | Available (GET and POST) | RFC 8484 over HTTP/3 |
-| DNSCrypt | Available (v2 over UDP) | [DNSCrypt protocol specification](https://github.com/DNSCrypt/dnscrypt-protocol) |
-| Oblivious DoH (ODoH) | Research | [RFC 9230](https://www.rfc-editor.org/rfc/rfc9230.html) |
-| Anonymized DNSCrypt | Research | [Anonymized DNSCrypt specification](https://github.com/DNSCrypt/dnscrypt-protocol/blob/master/ANONYMIZED-DNSCRYPT.txt) |
-
 Run `ednsdiag capabilities` instead of assuming a protocol is implemented.
+The command reports which transports are available and which remain research-only.
 
 ## Why a Skill and a CLI?
 
@@ -156,39 +147,8 @@ provider and profile used.
 
 Every query returns structured JSON compatible with
 [`schemas/result-v1.schema.json`](schemas/result-v1.schema.json).
-
-- `completed: true` means the encrypted protocol exchange completed; it does
-  not mean the DNS response was `NOERROR`.
-- `dns.rcode` is the DNS result. `NXDOMAIN`, `SERVFAIL`, and `REFUSED` are DNS
-  outcomes, not transport failures.
-- Empty `dns.answers` with `NOERROR` means NODATA.
-- `transport.server_authenticated` reports resolver endpoint authentication.
-- `dns.resolver_reports_dnssec_authenticated` reflects the resolver's AD bit;
-  it is not local DNSSEC validation.
-- `transport.bootstrap: system_resolver` means the operating system resolver
-  was used to locate the encrypted resolver endpoint.
-- `transport.proxy`, when present, is the HTTP(S) proxy endpoint actually
-  selected for DoH or DoT. Embedded credentials are never reported.
-- DNSCrypt reports `bootstrap: stamp_ip`, the authenticated provider name,
-  resolver certificate serial, and selected crypto construction.
-- DoH and DoH3 subtract a valid HTTP `Age` value from returned answer TTLs and
-  report it as `transport.http_age_seconds`.
-- Truncated or non-representable DNS answers are protocol failures rather than
-  partial `completed: true` results.
-
-Human-readable usage errors go to stderr. Machine-readable operational results
-go to stdout. Stable exit codes are:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | The requested encrypted DNS operation completed; inspect `dns.rcode`. |
-| `1` | Local or internal failure. |
-| `2` | Invalid input or CLI usage. |
-| `3` | Transport or DNS protocol failure. |
-| `4` | Known but unsupported capability or provider/protocol combination. |
-
-See [`references/contracts.md`](references/contracts.md) for the complete v1
-command and result contract.
+Exit codes, stdout/stderr rules, and field meanings are defined in
+[`references/contracts.md`](references/contracts.md).
 
 ## Security Model
 
