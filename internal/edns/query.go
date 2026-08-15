@@ -40,7 +40,7 @@ func queryWithExchange(ctx context.Context, options QueryOptions, exchange query
 		result.Error = &ErrorInfo{Class: "input", Message: err.Error()}
 		return result
 	}
-	if options.Proxy != "" && options.Protocol != "doh" && options.Protocol != "dot" {
+	if options.Proxy != "" && !ProxySupportedForProtocol(options.Protocol) {
 		result.Error = &ErrorInfo{Class: "unsupported", Message: fmt.Sprintf("proxying is not available for protocol %q", options.Protocol)}
 		return result
 	}
