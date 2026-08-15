@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/windyboy/encrypted-dns-skill/internal/edns"
 )
 
@@ -259,27 +258,7 @@ func successfulResult(operation, protocol, provider, address string) edns.Result
 
 func validateResultSchema(t *testing.T, document []byte) {
 	t.Helper()
-	schemaBytes, err := os.ReadFile(filepath.Join("..", "..", "schemas", "result-v1.schema.json"))
-	if err != nil {
-		t.Fatalf("read result schema: %v", err)
-	}
-	var schemaDocument any
-	if err := json.Unmarshal(schemaBytes, &schemaDocument); err != nil {
-		t.Fatalf("decode result schema: %v", err)
-	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("result-v1.schema.json", schemaDocument); err != nil {
-		t.Fatalf("add result schema: %v", err)
-	}
-	schema, err := compiler.Compile("result-v1.schema.json")
-	if err != nil {
-		t.Fatalf("compile result schema: %v", err)
-	}
-	var value any
-	if err := json.Unmarshal(document, &value); err != nil {
-		t.Fatalf("decode result JSON: %v", err)
-	}
-	if err := schema.Validate(value); err != nil {
+	if err := edns.ValidateResultV1JSON(document); err != nil {
 		t.Fatalf("result does not validate against result-v1: %v", err)
 	}
 }
