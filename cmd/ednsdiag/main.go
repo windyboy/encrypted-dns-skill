@@ -133,50 +133,39 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 		Method:     "post",
 	}
 	timeout := 5 * time.Second
-	positionals := make([]string, 0, 2)
 
-	for index := 0; index < len(args); index++ {
-		argument := args[index]
-		if !strings.HasPrefix(argument, "--") {
-			positionals = append(positionals, argument)
-			continue
-		}
-		key, value, found := strings.Cut(strings.TrimPrefix(argument, "--"), "=")
-		if !found {
-			index++
-			if index >= len(args) {
-				return options, 0, fmt.Errorf("--%s requires a value", key)
-			}
-			value = args[index]
-		}
-		switch key {
+	flags, positionals, err := consumeFlags(args)
+	if err != nil {
+		return options, 0, err
+	}
+	for _, flag := range flags {
+		switch flag.key {
 		case "protocol":
-			options.Protocol = strings.ToLower(value)
+			options.Protocol = strings.ToLower(flag.value)
 		case "provider":
-			options.Provider = strings.ToLower(value)
+			options.Provider = strings.ToLower(flag.value)
 		case "method":
-			options.Method = strings.ToLower(value)
+			options.Method = strings.ToLower(flag.value)
 		case "timeout":
-			parsed, err := time.ParseDuration(value)
+			parsed, err := time.ParseDuration(flag.value)
 			if err != nil {
-				return options, 0, fmt.Errorf("invalid timeout %q: %w", value, err)
+				return options, 0, fmt.Errorf("invalid timeout %q: %w", flag.value, err)
 			}
 			timeout = parsed
 		case "proxy":
-			options.Proxy = value
+			options.Proxy = flag.value
 		default:
-			return options, 0, fmt.Errorf("unknown query option --%s", key)
+			return options, 0, fmt.Errorf("unknown query option --%s", flag.key)
 		}
 	}
-	if len(positionals) < 1 || len(positionals) > 2 {
-		return options, 0, fmt.Errorf("query requires a domain and optional record type")
+	name, recordType, err := parseDomainAndType(positionals, "query")
+	if err != nil {
+		return options, 0, err
 	}
+	options.Name = name
+	options.RecordType = recordType
 	if timeout < 250*time.Millisecond || timeout > 30*time.Second {
 		return options, 0, fmt.Errorf("timeout must be between 250ms and 30s")
-	}
-	options.Name = positionals[0]
-	if len(positionals) == 2 {
-		options.RecordType = strings.ToUpper(positionals[1])
 	}
 	if !knownRecordType(options.RecordType) {
 		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
@@ -205,67 +194,56 @@ func parseQueryArgs(args []string) (edns.QueryOptions, time.Duration, error) {
 func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error) {
 	options := edns.CompareOptions{RecordType: "A", AttemptTimeout: 5 * time.Second, MaxAttempts: 4}
 	totalTimeout := 30 * time.Second
-	positionals := make([]string, 0, 2)
 	seenTargets := map[string]bool{}
 
-	for index := 0; index < len(args); index++ {
-		argument := args[index]
-		if !strings.HasPrefix(argument, "--") {
-			positionals = append(positionals, argument)
-			continue
-		}
-		key, value, found := strings.Cut(strings.TrimPrefix(argument, "--"), "=")
-		if !found {
-			index++
-			if index >= len(args) {
-				return options, 0, fmt.Errorf("--%s requires a value", key)
-			}
-			value = args[index]
-		}
-		switch key {
+	flags, positionals, err := consumeFlags(args)
+	if err != nil {
+		return options, 0, err
+	}
+	for _, flag := range flags {
+		switch flag.key {
 		case "target":
-			target, err := parseCompareTarget(value)
+			target, err := parseCompareTarget(flag.value)
 			if err != nil {
 				return options, 0, err
 			}
 			identity := target.Protocol + ":" + target.Provider + ":" + target.Method
 			if seenTargets[identity] {
-				return options, 0, fmt.Errorf("duplicate comparison target %q", value)
+				return options, 0, fmt.Errorf("duplicate comparison target %q", flag.value)
 			}
 			seenTargets[identity] = true
 			options.Targets = append(options.Targets, target)
 		case "timeout":
-			parsed, err := time.ParseDuration(value)
+			parsed, err := time.ParseDuration(flag.value)
 			if err != nil {
-				return options, 0, fmt.Errorf("invalid timeout %q: %w", value, err)
+				return options, 0, fmt.Errorf("invalid timeout %q: %w", flag.value, err)
 			}
 			totalTimeout = parsed
 		case "attempt-timeout":
-			parsed, err := time.ParseDuration(value)
+			parsed, err := time.ParseDuration(flag.value)
 			if err != nil {
-				return options, 0, fmt.Errorf("invalid attempt timeout %q: %w", value, err)
+				return options, 0, fmt.Errorf("invalid attempt timeout %q: %w", flag.value, err)
 			}
 			options.AttemptTimeout = parsed
 		case "max-attempts":
-			parsed, err := strconv.Atoi(value)
+			parsed, err := strconv.Atoi(flag.value)
 			if err != nil {
-				return options, 0, fmt.Errorf("invalid max attempts %q", value)
+				return options, 0, fmt.Errorf("invalid max attempts %q", flag.value)
 			}
 			options.MaxAttempts = parsed
 		case "proxy":
-			options.Proxy = value
+			options.Proxy = flag.value
 		default:
-			return options, 0, fmt.Errorf("unknown compare option --%s", key)
+			return options, 0, fmt.Errorf("unknown compare option --%s", flag.key)
 		}
 	}
 
-	if len(positionals) < 1 || len(positionals) > 2 {
-		return options, 0, fmt.Errorf("compare requires a domain and optional record type")
+	name, recordType, err := parseDomainAndType(positionals, "compare")
+	if err != nil {
+		return options, 0, err
 	}
-	options.Name = positionals[0]
-	if len(positionals) == 2 {
-		options.RecordType = strings.ToUpper(positionals[1])
-	}
+	options.Name = name
+	options.RecordType = recordType
 	if !knownRecordType(options.RecordType) {
 		return options, 0, fmt.Errorf("unsupported record type %q", options.RecordType)
 	}
@@ -298,6 +276,43 @@ func parseCompareArgs(args []string) (edns.CompareOptions, time.Duration, error)
 		}
 	}
 	return options, totalTimeout, nil
+}
+
+type flagValue struct {
+	key, value string
+}
+
+func consumeFlags(args []string) ([]flagValue, []string, error) {
+	positionals := make([]string, 0, 2)
+	flags := make([]flagValue, 0, len(args))
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if !strings.HasPrefix(argument, "--") {
+			positionals = append(positionals, argument)
+			continue
+		}
+		key, value, found := strings.Cut(strings.TrimPrefix(argument, "--"), "=")
+		if !found {
+			index++
+			if index >= len(args) {
+				return nil, nil, fmt.Errorf("--%s requires a value", key)
+			}
+			value = args[index]
+		}
+		flags = append(flags, flagValue{key: key, value: value})
+	}
+	return flags, positionals, nil
+}
+
+func parseDomainAndType(positionals []string, command string) (string, string, error) {
+	if len(positionals) < 1 || len(positionals) > 2 {
+		return "", "", fmt.Errorf("%s requires a domain and optional record type", command)
+	}
+	recordType := "A"
+	if len(positionals) == 2 {
+		recordType = strings.ToUpper(positionals[1])
+	}
+	return positionals[0], recordType, nil
 }
 
 func parseCompareTarget(value string) (edns.CompareTarget, error) {
