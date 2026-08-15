@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	quic "github.com/quic-go/quic-go"
@@ -69,19 +68,8 @@ func newDoH3Client(endpoint string, tlsConfig *tls.Config) (*http.Client, *http3
 		},
 	}
 	client := &http.Client{
-		Transport: transport,
-		CheckRedirect: func(request *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return fmt.Errorf("too many DoH3 redirects")
-			}
-			if request.URL.Scheme != "https" {
-				return fmt.Errorf("DoH3 redirect changed to a non-HTTPS scheme")
-			}
-			if !strings.EqualFold(request.URL.Hostname(), origin.Hostname()) {
-				return fmt.Errorf("DoH3 redirect changed authentication domain")
-			}
-			return nil
-		},
+		Transport:     transport,
+		CheckRedirect: sameOriginHTTPSRedirect("DoH3", origin.Hostname()),
 	}
 	return client, transport, capture, nil
 }
