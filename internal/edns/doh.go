@@ -51,19 +51,8 @@ func newDoHClientWithTLSConfig(endpoint, explicitProxy string, tlsConfig *tls.Co
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 	client := &http.Client{
-		Transport: transport,
-		CheckRedirect: func(request *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return fmt.Errorf("too many DoH redirects")
-			}
-			if request.URL.Scheme != "https" {
-				return fmt.Errorf("DoH redirect changed to a non-HTTPS scheme")
-			}
-			if !strings.EqualFold(request.URL.Hostname(), origin.Hostname()) {
-				return fmt.Errorf("DoH redirect changed authentication domain")
-			}
-			return nil
-		},
+		Transport:     transport,
+		CheckRedirect: sameOriginHTTPSRedirect("DoH", origin.Hostname()),
 	}
 	return client, proxyDisplayURL(proxyURL), nil
 }
