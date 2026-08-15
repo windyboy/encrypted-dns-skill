@@ -11,6 +11,10 @@ URLs, TLS sessions, or DNS wire messages themselves.
 
 ## Status
 
+The current release is **0.1.0**. `ednsdiag version` and the `version` field
+from `ednsdiag capabilities` report the same string. See
+[CHANGELOG.md](CHANGELOG.md) for the tagged history.
+
 Run `ednsdiag capabilities` instead of assuming a protocol is implemented.
 The command reports which transports are available and which remain research-only.
 

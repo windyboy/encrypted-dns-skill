@@ -2,6 +2,8 @@
 name: encrypted-dns-skill
 description: Query, probe, and compare DNS resolution through supported encrypted transports. Use for encrypted DNS record lookups, resolver connectivity tests, TLS and QUIC diagnostics, protocol comparisons, DNSSEC status inspection, and troubleshooting DoH, DoT, DoQ, DoH3, or DNSCrypt resolver endpoints.
 license: Apache-2.0
+metadata:
+  version: "0.1.0"
 ---
 
 # Encrypted DNS Diagnostics

@@ -13,7 +13,7 @@ import (
 	"github.com/windyboy/encrypted-dns-skill/internal/edns"
 )
 
-const version = "0.1.0-dev"
+const version = "0.1.0"
 
 const (
 	exitSuccess     = 0

@@ -96,7 +96,7 @@ func exchangeHTTPSDNSWithClient(ctx context.Context, client *http.Client, endpoi
 	if strings.EqualFold(method, "post") {
 		request.Header.Set("Content-Type", "application/dns-message")
 	}
-	request.Header.Set("User-Agent", "ednsdiag/0.1.0-dev")
+	request.Header.Set("User-Agent", "ednsdiag/0.1.0")
 
 	response, err := client.Do(request)
 	info.ElapsedMS = time.Since(started).Milliseconds()
